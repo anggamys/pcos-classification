@@ -18,8 +18,8 @@ def parse_args():
 
     parser.add_argument("--data-dir", type=str, default="datasets",
                         help="Path to dataset directory (default: datasets)")
-    parser.add_argument("--batch-size", type=int, default=32,
-                        help="Batch size (default: 32)")
+    parser.add_argument("--batch-size", type=int, default=64,
+                        help="Batch size (default: 64)")
     parser.add_argument("--image-size", type=int, default=224,
                         help="Image resize size (default: 224)")
     parser.add_argument("--epochs", type=int, default=30,
@@ -61,6 +61,14 @@ def main():
     for k, v in config.items():
         print(f"  {k}: {v}")
     print()
+
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        total_mem = torch.cuda.get_device_properties(0).total_mem / 1024**3
+        print(f"GPU: {gpu_name}")
+        print(f"VRAM: {total_mem:.1f} GB")
+        print(f"AMP: enabled (float16)")
+        print()
 
     print("Loading dataset...")
     train_loader, val_loader, test_loader = create_dataloaders(

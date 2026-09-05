@@ -1,8 +1,7 @@
-import os
 from pathlib import Path
 
 import torch
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, Subset
 from torchvision import transforms
 from PIL import Image
 
@@ -36,6 +35,22 @@ class PCOSDataset(Dataset):
         return image, label
 
 
+class TransformedSubset(Dataset):
+    def __init__(self, dataset, indices, transform):
+        self.dataset = dataset
+        self.indices = indices
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        img, label = self.dataset[self.indices[idx]]
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
+
 def get_transforms(train=True, image_size=224):
     if train:
         return transforms.Compose([
@@ -65,24 +80,29 @@ def create_dataloaders(root_dir, batch_size=32, image_size=224,
     full_dataset = PCOSDataset(root_dir, transform=None, denoise=denoise)
 
     total = len(full_dataset)
+    indices = torch.randperm(total, generator=torch.Generator().manual_seed(42))
+
     train_size = int(train_ratio * total)
     val_size = int(val_ratio * total)
-    test_size = total - train_size - val_size
 
-    generator = torch.Generator().manual_seed(42)
-    train_ds, val_ds, test_ds = random_split(
-        full_dataset, [train_size, val_size, test_size], generator=generator
-    )
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:train_size + val_size]
+    test_indices = indices[train_size + val_size:]
 
-    train_ds.dataset.transform = train_transform
-    val_ds.dataset.transform = val_transform
-    test_ds.dataset.transform = val_transform
+    train_ds = TransformedSubset(full_dataset, train_indices, train_transform)
+    val_ds = TransformedSubset(full_dataset, val_indices, val_transform)
+    test_ds = TransformedSubset(full_dataset, test_indices, val_transform)
+
+    persistent = num_workers > 0
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True,
-                              num_workers=num_workers, pin_memory=True)
+                              num_workers=num_workers, pin_memory=True,
+                              persistent_workers=persistent)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False,
-                            num_workers=num_workers, pin_memory=True)
+                            num_workers=num_workers, pin_memory=True,
+                            persistent_workers=persistent)
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False,
-                             num_workers=num_workers, pin_memory=True)
+                             num_workers=num_workers, pin_memory=True,
+                             persistent_workers=persistent)
 
     return train_loader, val_loader, test_loader

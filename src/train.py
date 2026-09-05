@@ -5,24 +5,29 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device):
+def train_one_epoch(model, loader, criterion, optimizer, device, scaler, use_amp):
     model.train()
     total_loss = 0
     correct = 0
     total = 0
 
     for images, labels in tqdm(loader, desc="Train", leave=False):
-        images = images.to(device)
-        labels = labels.float().to(device).unsqueeze(1)
+        images = images.to(device, non_blocking=True)
+        labels = labels.float().to(device, non_blocking=True).unsqueeze(1)
 
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+        optimizer.zero_grad(set_to_none=True)
+
+        with autocast(device_type=device.type, enabled=use_amp):
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         total_loss += loss.item() * images.size(0)
         predicted = (torch.sigmoid(outputs) > 0.5).float()
@@ -32,31 +37,40 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
     return total_loss / total, correct / total
 
 
-def validate(model, loader, criterion, device):
+@torch.no_grad()
+def validate(model, loader, criterion, device, use_amp):
     model.eval()
     total_loss = 0
     correct = 0
     total = 0
 
-    with torch.no_grad():
-        for images, labels in tqdm(loader, desc="Val", leave=False):
-            images = images.to(device)
-            labels = labels.float().to(device).unsqueeze(1)
+    for images, labels in tqdm(loader, desc="Val", leave=False):
+        images = images.to(device, non_blocking=True)
+        labels = labels.float().to(device, non_blocking=True).unsqueeze(1)
 
+        with autocast(device_type=device.type, enabled=use_amp):
             outputs = model(images)
             loss = criterion(outputs, labels)
 
-            total_loss += loss.item() * images.size(0)
-            predicted = (torch.sigmoid(outputs) > 0.5).float()
-            correct += (predicted == labels).sum().item()
-            total += labels.size(0)
+        total_loss += loss.item() * images.size(0)
+        predicted = (torch.sigmoid(outputs) > 0.5).float()
+        correct += (predicted == labels).sum().item()
+        total += labels.size(0)
 
     return total_loss / total, correct / total
 
 
 def train(model, train_loader, val_loader, config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if device.type == "cuda":
+        torch.backends.cudnn.benchmark = True
+        torch.set_float32_matmul_precision("high")
+
     model = model.to(device)
+
+    use_amp = device.type == "cuda"
+    scaler = GradScaler(enabled=use_amp)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = Adam(model.parameters(), lr=config["lr"],
@@ -72,6 +86,9 @@ def train(model, train_loader, val_loader, config):
     save_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Training on {device}")
+    if device.type == "cuda":
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"AMP: enabled (float16)")
     print(f"Epochs: {config['epochs']}, LR: {config['lr']}, Batch: {config['batch_size']}")
     print("-" * 60)
 
@@ -79,9 +96,9 @@ def train(model, train_loader, val_loader, config):
         start = time.time()
 
         train_loss, train_acc = train_one_epoch(
-            model, train_loader, criterion, optimizer, device
+            model, train_loader, criterion, optimizer, device, scaler, use_amp
         )
-        val_loss, val_acc = validate(model, val_loader, criterion, device)
+        val_loss, val_acc = validate(model, val_loader, criterion, device, use_amp)
 
         scheduler.step(val_loss)
 

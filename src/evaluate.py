@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from torch.amp import autocast
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     confusion_matrix, roc_curve, auc, classification_report,
@@ -8,18 +9,20 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 
 
+@torch.no_grad()
 def evaluate_model(model, loader, device):
     model.eval()
     all_probs = []
     all_labels = []
+    use_amp = device.type == "cuda"
 
-    with torch.no_grad():
-        for images, labels in loader:
-            images = images.to(device)
+    for images, labels in loader:
+        images = images.to(device, non_blocking=True)
+        with autocast(device_type=device.type, enabled=use_amp):
             outputs = model(images)
-            probs = torch.sigmoid(outputs).cpu().numpy().flatten()
-            all_probs.extend(probs)
-            all_labels.extend(labels.numpy())
+        probs = torch.sigmoid(outputs).cpu().numpy().flatten()
+        all_probs.extend(probs)
+        all_labels.extend(labels.numpy())
 
     all_probs = np.array(all_probs)
     all_labels = np.array(all_labels)

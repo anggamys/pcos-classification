@@ -1,2 +1,5 @@
-# Module / Library
+# Module
 .venv
+
+# Build
+__pycache__

@@ -57,25 +57,48 @@ pip install -r requirements.txt
 
 ## Penggunaan
 
+### CLI
+
+```bash
+# Default settings
+python main.py
+
+# Custom training
+python main.py --epochs 50 --lr 5e-5 --batch-size 64 --denoise
+
+# Resume with specific dataset
+python main.py --data-dir /path/to/data --save-dir my_checkpoints --patience 5
+```
+
+### Semua Argumen
+
+| Argumen | Default | Deskripsi |
+|---|---|---|
+| `--data-dir` | `datasets` | Path dataset directory |
+| `--batch-size` | `32` | Batch size |
+| `--image-size` | `224` | Image resize size |
+| `--epochs` | `30` | Max training epochs |
+| `--lr` | `1e-4` | Learning rate |
+| `--weight-decay` | `1e-4` | Weight decay |
+| `--patience` | `10` | Early stopping patience |
+| `--save-dir` | `checkpoints` | Checkpoint save directory |
+| `--denoise` | `false` | Enable wavelet denoising |
+| `--no-pretrained` | `false` | Disable pretrained weights |
+| `--num-workers` | `2` | DataLoader workers |
+
+### Python API
+
 ```python
 from src.dataset import create_dataloaders
 from src.models.densenet121 import DenseNet121Attention
 from src.train import train
 from src.evaluate import evaluate_model, compute_metrics
 
-# Load data
 train_loader, val_loader, test_loader = create_dataloaders('datasets', batch_size=32)
-
-# Init model (11.4M params)
 model = DenseNet121Attention(num_classes=1, pretrained=True)
 
-# Train
 config = {'epochs': 30, 'lr': 1e-4, 'weight_decay': 1e-4, 'patience': 10, 'save_dir': 'checkpoints'}
 history = train(model, train_loader, val_loader, config)
-
-# Evaluate
-results = evaluate_model(model, test_loader, device)
-metrics = compute_metrics(results)
 ```
 
 ## Hasil (Artikel)

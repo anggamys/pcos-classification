@@ -1,51 +1,50 @@
 # PCOS Classification
 
-Klasifikasi Polycystic Ovary Syndrome (PCOS) dari citra ultrasound menggunakan DenseNet-121 dengan Self-Attention mechanism.
+Klasifikasi Polycystic Ovary Syndrome (PCOS) dari citra ultrasound menggunakan Deep Learning dengan Self-Attention mechanism.
 
-Duplikasi dari artikel:
-> Tiwari, S., Shukla, A., & Sharma, A.K. (2026). *Attention-guided lightweight deep learning architecture for classification of polycystic ovary syndrome from ultrasound images.* Intelligence-Based Medicine, 13, 100358. DOI: [10.1016/j.ibmed.2026.100358](https://doi.org/10.1016/j.ibmed.2026.100358)
+## Referensi
+
+1. Tiwari, S., Shukla, A., & Sharma, A.K. (2026). *Attention-guided lightweight deep learning architecture for classification of polycystic ovary syndrome from ultrasound images.* Intelligence-Based Medicine, 13, 100358. DOI: [10.1016/j.ibmed.2026.100358](https://doi.org/10.1016/j.ibmed.2026.100358)
+
+2. Sundari, M.S., et al. (2025). *Transfer Learning-Enhanced CNN Model for Integrative Ultrasound and Biomarker-Based Diagnosis of Polycystic Ovarian Disease.* Scientific Reports, 15:34519. DOI: [10.1038/s41598-025-17711-w](https://doi.org/10.1038/s41598-025-17711-w)
 
 ## Struktur Proyek
 
 ```
 pcos-classification/
 ├── datasets/
-│   ├── infected/          # 6.784 citra PCOS
-│   └── noninfected/       # 5.000 citra sehat
+│   ├── infected/              # 6.784 citra PCOS
+│   └── noninfected/           # 5.000 citra sehat
 ├── src/
-│   ├── dataset.py         # Custom Dataset & DataLoader
-│   ├── preprocessing.py   # Wavelet denoising (BayesShrink)
-│   ├── train.py           # Training pipeline
-│   ├── evaluate.py        # Metrics & visualisasi
+│   ├── dataset.py             # Custom Dataset & DataLoader
+│   ├── preprocessing.py       # Wavelet denoising (BayesShrink)
+│   ├── train.py               # Training pipeline
+│   ├── evaluate.py            # Metrics & visualisasi
+│   ├── optimize.py            # Bayesian Optimization (Optuna)
+│   ├── gradcam.py             # Grad-CAM visualisasi
+│   ├── smote.py               # SMOTE untuk class imbalance
 │   └── models/
-│       ├── attention.py   # Self-Attention module
-│       └── densenet121.py # DenseNet-121 + Attention
-├── checkpoints/           # Model checkpoints
+│       ├── attention.py       # Self-Attention module
+│       ├── densenet121.py     # DenseNet-121 + Attention
+│       └── efficientnet_b3.py # EfficientNet-B3 + Attention
+├── checkpoints/               # Model checkpoints
 ├── requirements.txt
 └── main.py
 ```
 
-## Pipeline
+## Fitur
 
-### 1. Preprocessing
-- Resize 224 x 224, normalisasi [0, 1]
-- Wavelet denoising (BayesShrink) - opsional
-- Augmentasi: RandomRotation(15), RandomHorizontalFlip, RandomResizedCrop
+### Model Arsitektur
+- **DenseNet-121 + Attention** - 11.4M parameters (default)
+- **EfficientNet-B3 + Attention** - Alternatif backbone
+- **Self-Attention** - Multi-head attention (8 heads)
 
-### 2. Arsitektur
-- **Backbone**: DenseNet-121 pretrained (ImageNet)
-- **Self-Attention**: Multi-head attention (8 heads) pada feature maps
-- **Classifier**: FC(1024, 256) -> ReLU -> Dropout(0.3) -> FC(256, 1) -> Sigmoid
-
-### 3. Training
-- Optimizer: Adam (lr=1e-4, weight_decay=1e-4)
-- Loss: BCEWithLogitsLoss
-- Early stopping: patience=10
-- Scheduler: ReduceLROnPlateau
-
-### 4. Evaluasi
-- Accuracy, Precision, Recall, F1-Score, Specificity, AUC
-- Confusion matrix, ROC curve, Precision-Recall curve
+### Advanced Features
+- **Bayesian Optimization** - Auto-tune hyperparameter dengan Optuna
+- **Grad-CAM** - Visual heatmap untuk interpretasi model
+- **SMOTE** - Oversampling untuk class imbalance
+- **Mixed Precision (AMP)** - Training float16 untuk percepatan
+- **Wavelet Denoising** - preprocessing BayesShrink (opsional)
 
 ## Instalasi
 
@@ -57,17 +56,31 @@ pip install -r requirements.txt
 
 ## Penggunaan
 
-### CLI
-
+### Basic Training
 ```bash
-# Default settings
+# Default (DenseNet-121)
 python main.py
+
+# EfficientNet-B3
+python main.py --model efficientnet_b3
 
 # Custom training
 python main.py --epochs 50 --lr 5e-5 --batch-size 64 --denoise
+```
 
-# Resume with specific dataset
-python main.py --data-dir /path/to/data --save-dir my_checkpoints --patience 5
+### Advanced Features
+```bash
+# Bayesian Optimization
+python main.py --optimize --n-trials 20
+
+# Grad-CAM visualization
+python main.py --gradcam --gradcam-samples 5
+
+# SMOTE untuk class imbalance
+python main.py --smote
+
+# Semua fitur combined
+python main.py --model efficientnet_b3 --optimize --gradcam --smote --epochs 50
 ```
 
 ### Semua Argumen
@@ -75,7 +88,7 @@ python main.py --data-dir /path/to/data --save-dir my_checkpoints --patience 5
 | Argumen | Default | Deskripsi |
 |---|---|---|
 | `--data-dir` | `datasets` | Path dataset directory |
-| `--batch-size` | `32` | Batch size |
+| `--batch-size` | `64` | Batch size |
 | `--image-size` | `224` | Image resize size |
 | `--epochs` | `30` | Max training epochs |
 | `--lr` | `1e-4` | Learning rate |
@@ -85,28 +98,41 @@ python main.py --data-dir /path/to/data --save-dir my_checkpoints --patience 5
 | `--denoise` | `false` | Enable wavelet denoising |
 | `--no-pretrained` | `false` | Disable pretrained weights |
 | `--num-workers` | `2` | DataLoader workers |
+| `--model` | `densenet121` | Model: densenet121 / efficientnet_b3 |
+| `--dropout` | `0.3` | Dropout rate |
+| `--optimize` | `false` | Jalankan Bayesian Optimization |
+| `--n-trials` | `20` | Jumlah Optuna trials |
+| `--gradcam` | `false` | Generate Grad-CAM |
+| `--gradcam-samples` | `5` | Jumlah sampel Grad-CAM |
+| `--smote` | `false` | Apply SMOTE |
 
-### Python API
+## Pipeline
 
-```python
-from src.dataset import create_dataloaders
-from src.models.densenet121 import DenseNet121Attention
-from src.train import train
-from src.evaluate import evaluate_model, compute_metrics
+### 1. Preprocessing
+- Resize 224×224, normalisasi [0,1]
+- Wavelet denoising (BayesShrink) - opsional
+- Augmentasi: RandomRotation(15), RandomHorizontalFlip, RandomResizedCrop
 
-train_loader, val_loader, test_loader = create_dataloaders('datasets', batch_size=32)
-model = DenseNet121Attention(num_classes=1, pretrained=True)
+### 2. Training
+- Optimizer: Adam (lr=1e-4, weight_decay=1e-4)
+- Loss: BCEWithLogitsLoss
+- Mixed Precision (AMP) untuk percepatan
+- Early stopping: patience=10
+- Scheduler: ReduceLROnPlateau
 
-config = {'epochs': 30, 'lr': 1e-4, 'weight_decay': 1e-4, 'patience': 10, 'save_dir': 'checkpoints'}
-history = train(model, train_loader, val_loader, config)
-```
+### 3. Evaluasi
+- Accuracy, Precision, Recall, F1-Score, Specificity, AUC
+- Confusion matrix, ROC curve
+- Grad-CAM heatmap untuk interpretasi
 
-## Hasil (Artikel)
+## Hasil (Referensi)
 
 | Model | Accuracy | Precision | Recall | F1 | AUC |
 |---|---|---|---|---|---|
-| DenseNet-121 + Attention | 99.13% | 1.000 | 0.9851 | 1.0000 | 0.9997 |
+| DenseNet-121 + Attention [1] | 99.13% | 1.000 | 0.9851 | 1.0000 | 0.9997 |
+| EfficientNet-B3 + Attention [2] | 94.8% | 94.0% | 93.2% | 93.6% | 0.97 |
 
-## Referensi
+## Dataset
 
-- Dataset: [PCOS-XAI Ultrasound Dataset](https://www.kaggle.com/datasets/ibadeus/pcos-xai-ultrasound-dataset)
+- **PCOS-XAI Ultrasound Dataset** - 11.784 gambar (6.784 PCOS, 5.000 sehat)
+- Source: [Kaggle](https://www.kaggle.com/datasets/ibadeus/pcos-xai-ultrasound-dataset)

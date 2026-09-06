@@ -43,6 +43,9 @@ def parse_args():
     parser.add_argument("--model", type=str, default="densenet121",
                         choices=["densenet121", "efficientnet_b3"],
                         help="Model architecture (default: densenet121)")
+    parser.add_argument("--attention", type=str, default="self_attention",
+                        choices=["self_attention", "se_net", "cbam", "transformer"],
+                        help="Attention mechanism (default: self_attention)")
     parser.add_argument("--dropout", type=float, default=0.3,
                         help="Dropout rate (default: 0.3)")
     parser.add_argument("--optimize", action="store_true",
@@ -59,14 +62,15 @@ def parse_args():
     return parser.parse_args()
 
 
-def get_model(model_name, pretrained=True, dropout=0.3):
+def get_model(model_name, pretrained=True, dropout=0.3, attention_type="self_attention"):
     if model_name == "efficientnet_b3":
         return EfficientNetB3Attention(
             num_classes=1, pretrained=pretrained, dropout=dropout
         )
     else:
         return DenseNet121Attention(
-            num_classes=1, pretrained=pretrained, dropout=dropout
+            num_classes=1, pretrained=pretrained, dropout=dropout,
+            attention_type=attention_type
         )
 
 
@@ -89,6 +93,7 @@ def main():
     for k, v in config.items():
         print(f"  {k}: {v}")
     print(f"  model: {args.model}")
+    print(f"  attention: {args.attention}")
     print(f"  dropout: {args.dropout}")
     print()
 
@@ -118,7 +123,8 @@ def main():
         print("\nRunning Bayesian Optimization...")
         from src.optimize import run_optuna
         best_params = run_optuna(
-            model_class=lambda **kw: get_model(args.model, pretrained=not args.no_pretrained, **kw),
+            model_class=lambda **kw: get_model(args.model, pretrained=not args.no_pretrained,
+                                                attention_type=args.attention, **kw),
             train_loader=train_loader,
             val_loader=val_loader,
             device=device,
@@ -131,8 +137,9 @@ def main():
         args.batch_size = best_params["batch_size"]
         print(f"\nBest params: {best_params}")
 
-    print(f"\nInitializing {args.model}...")
-    model = get_model(args.model, pretrained=not args.no_pretrained, dropout=args.dropout)
+    print(f"\nInitializing {args.model} with {args.attention} attention...")
+    model = get_model(args.model, pretrained=not args.no_pretrained,
+                      dropout=args.dropout, attention_type=args.attention)
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total params:     {total_params:,}")

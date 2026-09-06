@@ -125,12 +125,26 @@ python main.py --model efficientnet_b3 --optimize --gradcam --smote --epochs 50
 - Confusion matrix, ROC curve
 - Grad-CAM heatmap untuk interpretasi
 
-## Hasil (Referensi)
+## Hasil
 
-| Model | Accuracy | Precision | Recall | F1 | AUC |
-|---|---|---|---|---|---|
-| DenseNet-121 + Attention [1] | 99.13% | 1.000 | 0.9851 | 1.0000 | 0.9997 |
-| EfficientNet-B3 + Attention [2] | 94.8% | 94.0% | 93.2% | 93.6% | 0.97 |
+### DenseNet-121 + Attention (Replikasi)
+| Metrik | Hasil | Artikel |
+|---|---|---|
+| Accuracy | 99.72% | 99.13% |
+| Precision | 100.0% | 100.0% |
+| Recall | 99.50% | 98.51% |
+| F1-Score | 99.75% | 100.0% |
+| Specificity | 100.0% | - |
+| AUC | 100.0% | 99.97% |
+
+### EfficientNet-B3 + Attention (Artikel 2)
+| Metrik | Artikel |
+|---|---|
+| Accuracy | 94.8% |
+| Precision | 94.0% |
+| Recall | 93.2% |
+| F1-Score | 93.6% |
+| AUC | 0.97 |
 
 ## Dataset
 

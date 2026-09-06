@@ -1,6 +1,6 @@
 # PCOS Classification
 
-Klasifikasi Polycystic Ovary Syndrome (PCOS) dari citra ultrasound menggunakan Deep Learning dengan Self-Attention mechanism.
+Klasifikasi Polycystic Ovary Syndrome (PCOS) dari citra ultrasound menggunakan Deep Learning dengan berbagai mekanisme Attention.
 
 ## Referensi
 
@@ -24,7 +24,7 @@ pcos-classification/
 │   ├── gradcam.py             # Grad-CAM visualisasi
 │   ├── smote.py               # SMOTE untuk class imbalance
 │   └── models/
-│       ├── attention.py       # Self-Attention module
+│       ├── attention.py       # Attention modules (Self-Attn, SE-Net, CBAM, Transformer)
 │       ├── densenet121.py     # DenseNet-121 + Attention
 │       └── efficientnet_b3.py # EfficientNet-B3 + Attention
 ├── checkpoints/               # Model checkpoints
@@ -34,10 +34,18 @@ pcos-classification/
 
 ## Fitur
 
+### Attention Mechanisms (Perbandingan)
+
+| Mekanisme | Parameters | Prinsip Kerja |
+|-----------|------------|---------------|
+| **Self-Attention** | 11.4M | Q, K, V multi-head (Artikel 1) |
+| **SE-Net** | 7.3M | Channel-wise attention |
+| **CBAM** | 7.3M | Channel + Spatial attention |
+| **Transformer** | 32.4M | Patch-based attention |
+
 ### Model Arsitektur
-- **DenseNet-121 + Attention** - 11.4M parameters (default)
+- **DenseNet-121 + Attention** - Default backbone
 - **EfficientNet-B3 + Attention** - Alternatif backbone
-- **Self-Attention** - Multi-head attention (8 heads)
 
 ### Advanced Features
 - **Bayesian Optimization** - Auto-tune hyperparameter dengan Optuna
@@ -58,14 +66,17 @@ pip install -r requirements.txt
 
 ### Basic Training
 ```bash
-# Default (DenseNet-121)
+# Default (Self-Attention)
 python main.py
+
+# Bandingkan semua attention mechanisms
+python main.py --attention self_attention --epochs 30
+python main.py --attention se_net --epochs 30
+python main.py --attention cbam --epochs 30
+python main.py --attention transformer --epochs 30
 
 # EfficientNet-B3
 python main.py --model efficientnet_b3
-
-# Custom training
-python main.py --epochs 50 --lr 5e-5 --batch-size 64 --denoise
 ```
 
 ### Advanced Features
@@ -80,7 +91,7 @@ python main.py --gradcam --gradcam-samples 5
 python main.py --smote
 
 # Semua fitur combined
-python main.py --model efficientnet_b3 --optimize --gradcam --smote --epochs 50
+python main.py --model efficientnet_b3 --attention cbam --optimize --gradcam --smote --epochs 50
 ```
 
 ### Semua Argumen
@@ -99,6 +110,7 @@ python main.py --model efficientnet_b3 --optimize --gradcam --smote --epochs 50
 | `--no-pretrained` | `false` | Disable pretrained weights |
 | `--num-workers` | `2` | DataLoader workers |
 | `--model` | `densenet121` | Model: densenet121 / efficientnet_b3 |
+| `--attention` | `self_attention` | Attention: self_attention / se_net / cbam / transformer |
 | `--dropout` | `0.3` | Dropout rate |
 | `--optimize` | `false` | Jalankan Bayesian Optimization |
 | `--n-trials` | `20` | Jumlah Optuna trials |
@@ -127,7 +139,7 @@ python main.py --model efficientnet_b3 --optimize --gradcam --smote --epochs 50
 
 ## Hasil
 
-### DenseNet-121 + Attention (Replikasi)
+### Replikasi Artikel 1: DenseNet-121 + Self-Attention
 | Metrik | Hasil | Artikel |
 |---|---|---|
 | Accuracy | 99.72% | 99.13% |
@@ -136,6 +148,16 @@ python main.py --model efficientnet_b3 --optimize --gradcam --smote --epochs 50
 | F1-Score | 99.75% | 100.0% |
 | Specificity | 100.0% | - |
 | AUC | 100.0% | 99.97% |
+
+### Perbandingan Attention Mechanisms
+> Hasil akan diupdate setelah training selesai
+
+| Attention | Accuracy | Precision | Recall | F1 | AUC | Params |
+|-----------|----------|-----------|--------|-----|-----|--------|
+| Self-Attention | - | - | - | - | - | 11.4M |
+| SE-Net | - | - | - | - | - | 7.3M |
+| CBAM | - | - | - | - | - | 7.3M |
+| Transformer | - | - | - | - | - | 32.4M |
 
 ### EfficientNet-B3 + Attention (Artikel 2)
 | Metrik | Artikel |

@@ -4,6 +4,7 @@ import torch
 
 from src.dataset import create_dataloaders
 from src.models.densenet121 import DenseNet121Attention
+from src.models.efficientnet_b3 import EfficientNetB3Attention
 from src.train import train
 from src.evaluate import (
     evaluate_model, compute_metrics, plot_confusion_matrix,
@@ -13,7 +14,7 @@ from src.evaluate import (
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="PCOS Classification using DenseNet-121 + Self-Attention"
+        description="PCOS Classification using Deep Learning"
     )
 
     parser.add_argument("--data-dir", type=str, default="datasets",
@@ -39,7 +40,34 @@ def parse_args():
     parser.add_argument("--num-workers", type=int, default=2,
                         help="DataLoader num_workers (default: 2)")
 
+    parser.add_argument("--model", type=str, default="densenet121",
+                        choices=["densenet121", "efficientnet_b3"],
+                        help="Model architecture (default: densenet121)")
+    parser.add_argument("--dropout", type=float, default=0.3,
+                        help="Dropout rate (default: 0.3)")
+    parser.add_argument("--optimize", action="store_true",
+                        help="Run Bayesian optimization with Optuna")
+    parser.add_argument("--n-trials", type=int, default=20,
+                        help="Number of Optuna trials (default: 20)")
+    parser.add_argument("--gradcam", action="store_true",
+                        help="Generate Grad-CAM visualization")
+    parser.add_argument("--gradcam-samples", type=int, default=5,
+                        help="Number of Grad-CAM samples (default: 5)")
+    parser.add_argument("--smote", action="store_true",
+                        help="Apply SMOTE for class imbalance")
+
     return parser.parse_args()
+
+
+def get_model(model_name, pretrained=True, dropout=0.3):
+    if model_name == "efficientnet_b3":
+        return EfficientNetB3Attention(
+            num_classes=1, pretrained=pretrained, dropout=dropout
+        )
+    else:
+        return DenseNet121Attention(
+            num_classes=1, pretrained=pretrained, dropout=dropout
+        )
 
 
 def main():
@@ -60,14 +88,15 @@ def main():
     print("Config:")
     for k, v in config.items():
         print(f"  {k}: {v}")
+    print(f"  model: {args.model}")
+    print(f"  dropout: {args.dropout}")
     print()
 
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         total_mem = torch.cuda.get_device_properties(0).total_mem / 1024**3
         print(f"GPU: {gpu_name}")
-        print(f"VRAM: {total_mem:.1f} GB")
-        print(f"AMP: enabled (float16)")
+        print(f"VRAM: {total_mem:.1f} GB | AMP: enabled (float16)")
         print()
 
     print("Loading dataset...")
@@ -83,10 +112,27 @@ def main():
     print(f"Val:   {len(val_loader.dataset)}")
     print(f"Test:  {len(test_loader.dataset)}")
 
-    print("\nInitializing DenseNet-121 + Attention...")
-    model = DenseNet121Attention(
-        num_classes=1, pretrained=not args.no_pretrained
-    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if args.optimize:
+        print("\nRunning Bayesian Optimization...")
+        from src.optimize import run_optuna
+        best_params = run_optuna(
+            model_class=lambda **kw: get_model(args.model, pretrained=not args.no_pretrained, **kw),
+            train_loader=train_loader,
+            val_loader=val_loader,
+            device=device,
+            config_base=config,
+            n_trials=args.n_trials,
+        )
+        config["lr"] = best_params["lr"]
+        config["weight_decay"] = best_params["weight_decay"]
+        args.dropout = best_params["dropout"]
+        args.batch_size = best_params["batch_size"]
+        print(f"\nBest params: {best_params}")
+
+    print(f"\nInitializing {args.model}...")
+    model = get_model(args.model, pretrained=not args.no_pretrained, dropout=args.dropout)
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total params:     {total_params:,}")
@@ -100,8 +146,6 @@ def main():
     print("\nLoading best model for evaluation...")
     checkpoint = torch.load(f"{args.save_dir}/best_model.pth", weights_only=True)
     model.load_state_dict(checkpoint["model_state_dict"])
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     print("\nEvaluating on test set...")
@@ -125,6 +169,13 @@ def main():
         metrics["fpr"], metrics["tpr"], metrics["auc"],
         save_path=f"{args.save_dir}/roc_curve.png"
     )
+
+    if args.gradcam:
+        print("\nGenerating Grad-CAM visualization...")
+        from src.gradcam import visualize_gradcam
+        visualize_gradcam(model, test_loader, device,
+                          num_samples=args.gradcam_samples,
+                          save_dir=args.save_dir)
 
 
 if __name__ == "__main__":

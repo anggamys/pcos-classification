@@ -1,25 +1,26 @@
 import torch
 import torch.nn as nn
-from torchvision.models import densenet121, DenseNet121_Weights
+from torchvision.models import efficientnet_b3, EfficientNet_B3_Weights
 
 from .attention import SelfAttention
 
 
-class DenseNet121Attention(nn.Module):
+class EfficientNetB3Attention(nn.Module):
     def __init__(self, num_classes=1, pretrained=True, dropout=0.3):
         super().__init__()
-        weights = DenseNet121_Weights.IMAGENET1K_V1 if pretrained else None
-        self.backbone = densenet121(weights=weights)
+        weights = EfficientNet_B3_Weights.IMAGENET1K_V1 if pretrained else None
+        self.backbone = efficientnet_b3(weights=weights)
 
-        feature_dim = self.backbone.classifier.in_features
+        feature_dim = self.backbone.classifier[1].in_features
         self.backbone.classifier = nn.Identity()
 
         self.attention = SelfAttention(embed_dim=feature_dim, num_heads=8)
 
         self.classifier = nn.Sequential(
+            nn.Dropout(p=dropout),
             nn.Linear(feature_dim, 256),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
+            nn.Dropout(p=dropout),
             nn.Linear(256, 1),
         )
 

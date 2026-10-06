@@ -1,0 +1,198 @@
+%% PCOS Classification manuscript — Elsevier CAS single-column (cas-sc).
+%% Based on template/cas-sc-template.tex (CAS Bundle v2.4).
+%% Build: `make` in publication/  or  `latexmk -pdf main.tex` in manuscript/.
+\documentclass[a4paper,fleqn]{cas-sc}
+
+\usepackage[authoryear,longnamesfirst]{natbib}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+
+%%%Author macros
+\def\tsc#1{\csdef{#1}{\textsc{\lowercase{#1}}\xspace}}
+\tsc{WGM}
+\tsc{QE}
+%%%
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+\shorttitle{Wavelet denoising and follicle segmentation for PCOS classification}
+\shortauthors{Author et al.}
+
+\title[mode = title]{Effect of Wavelet Denoising and Follicle Segmentation on PCOS Classification with DenseNet-121 + Attention and Grad-CAM}
+
+\tnotemark[1]
+\tnotetext[1]{Manuscript draft — values in Tables~\ref{tbl:matrix}--\ref{tbl:quality} are placeholders to be filled from \texttt{experiments/results/results.csv} and \texttt{experiments/quality/quality.csv}.}
+
+\author[1]{First Author}[orcid=0000-0000-0000-0000]
+\cormark[1]
+\ead{first.author@example.ac.id}
+\credit{Conceptualization, Methodology, Software, Writing -- original draft}
+
+\author[1]{Second Author}
+\ead{second.author@example.ac.id}
+\credit{Supervision, Writing -- review \& editing}
+
+\affiliation[1]{organization={Department, University},
+            addressline={Street},
+            city={City},
+            postcode={00000},
+            state={},
+            country={Indonesia}}
+
+\cortext[1]{Corresponding author}
+
+\begin{abstract}
+Polycystic ovary syndrome (PCOS) ultrasound reading is operator-dependent, and small follicles are easily missed. This study measures the isolated contribution of (i) BayesShrink wavelet denoising and (ii) unsupervised follicle segmentation (Otsu/adaptive + morphology, ROI/masked input) to DenseNet-121 + attention classification on the PCOS-XAI ultrasound dataset (11,784 images: 6,784 PCOS, 5,000 healthy), with Grad-CAM interpretability. Six experiments (E1--E6) ablate denoising, CLAHE enhancement, ROI/masked input, and self-attention vs.\ CBAM. Image-quality evidence (PSNR/SSIM, ROI statistics) and diagnostic metrics (accuracy, precision, recall, F1, specificity, AUC) are reported on a fixed 70/15/15 split (seed 42). \emph{TODO: replace with final numbers.}
+\end{abstract}
+
+\begin{graphicalabstract}
+% TODO: add pipeline diagram as figures/pipeline.pdf and uncomment:
+% \includegraphics{figures/pipeline.pdf}
+\end{graphicalabstract}
+
+\begin{highlights}
+\item Ablation of BayesShrink denoising vs.\ baseline on image quality and AUC (H1).
+\item Explicit follicle ROI/masked input vs.\ implicit attention focus (H2).
+\item Self-attention vs.\ CBAM accuracy--efficiency trade-off with params and latency (H3).
+\end{highlights}
+
+\begin{keywords}
+PCOS \sep ultrasound \sep wavelet denoising \sep follicle segmentation \sep DenseNet-121 \sep attention \sep Grad-CAM
+\end{keywords}
+
+\maketitle
+
+\section{Introduction}\label{sec:intro}
+% TODO (1--2 pages). Suggested narrative, following references/kajian-literatur-gap-hipotesis.md:
+% operator dependence of USG reading $\rightarrow$ two prior directions (Tiwari et al.\ lightweight attention; Sundari et al.\ optimization + Grad-CAM) $\rightarrow$ what they left open (G1--G5) $\rightarrow$ this work's scope: G4 (+G5 via params/latency) with H1--H3, E1--E6.
+% State contributions explicitly: (1) isolated denoising ablation, (2) explicit ROI vs.\ implicit attention, (3) attention mechanism comparison.
+
+\section{Related work}\label{sec:related}
+\subsection{Attention-guided lightweight PCOS classification}\label{sec:tiwari}
+Tiwari, Shukla, and Sharma~\citep{Tiwari2026} combine four backbones (custom CNN, VGG19, DenseNet-121, EfficientNet-B0) with a self-attention module (Q, K, V scaled dot-product) on PCOS-XAI, with BayesShrink + Gaussian preprocessing. DenseNet-121 + attention reaches 99.13\% accuracy (AUC 0.9997). Limitation: denoising is applied to all images with no denoise vs.\ non-denoise ablation, so its contribution is unmeasured.
+
+\subsection{Optimized CNN with Grad-CAM}\label{sec:sundari}
+Sundari et al.~\citep{Sundari2025} use an Enhanced EfficientNet-B3 with attention, batch normalization, dropout (0.35 via Bayesian optimization) and Grad-CAM on PCOSGen, reaching 94.8\% accuracy (AUC 0.97); attention alone lifts accuracy 91.0\% $\rightarrow$ 93.2\%. Biomarker fusion is described but not included in the final evaluated model (paired image--biomarker data limited).
+
+\subsection{Research gaps}\label{sec:gaps}
+Table~\ref{tbl:gaps} summarizes gaps G1--G5. G1 (multimodal fusion) is the largest academically but infeasible here (no open paired image--biomarker data); G2--G3 are recorded as future work. This study takes \textbf{G4 as the primary gap} (no systematic attention-mechanism comparison), with a G5 element (parameter/latency measurement). H1--H3 and E1--E6 are defined in Sections~\ref{sec:hypotheses}--\ref{sec:design}.
+
+\begin{table}[width=\textwidth,pos=ht]
+\caption{Research gaps from the two reference articles.}\label{tbl:gaps}
+\begin{tabular*}{\tblwidth}{@{}lL@{}}
+\toprule
+Gap & Evidence \\
+\midrule
+G1: multimodal fusion described but not evaluated & Sundari et al.: biomarkers excluded from final model, full fusion is stated future work \\
+G2: no cross-dataset validation & Each article validates internally on one dataset (PCOS-XAI / PCOSGen) \\
+G3: no uncertainty quantification & Single point estimates only; no MC Dropout, ensemble, or calibration \\
+G4: no systematic attention comparison (taken as main gap) & Each uses a single attention variant with no comparator \\
+G5: lightweight claim without deployment benchmark (measured here via params/latency) & No latency/memory/on-device measurement \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\section{Materials and methods}\label{sec:methods}
+
+\subsection{Dataset and splits}\label{sec:dataset}
+PCOS-XAI ultrasound dataset, 11,784 images (6,784 PCOS, 5,000 healthy); fixed 70/15/15 train/val/test split, seed 42, so all of E1--E6 are comparable. Note real-world quirks (duplicates, multi-resolution, class imbalance) and absence of patient metadata / ground-truth masks (segmentation is therefore unsupervised, ROI-supporting only).
+
+\subsection{Preprocessing and follicle segmentation}\label{sec:preproc}
+Resize $224\times224$, normalize to $[0,1]$; optional BayesShrink wavelet denoising; optional CLAHE; unsupervised follicle segmentation (Otsu/adaptive + morphology + border-component removal + dark-percentile fallback when Otsu captures background with coverage $>50\%$); input modes: \texttt{full} / \texttt{roi} (padded crop, \texttt{--seg-pad} 8~px) / \texttt{masked}. Augmentation: RandomRotation(15), RandomHorizontalFlip, RandomResizedCrop. Implementation: \texttt{src/preprocessing.py}, \texttt{src/segmentation.py}, \texttt{src/image\_quality.py}.
+
+\subsection{Model: DenseNet-121 + attention}\label{sec:model}
+Backbone DenseNet-121 with attention head; variants compared: self-attention (Q, K, V multi-head, $\sim$11.4M params) vs.\ CBAM (channel + spatial, $\sim$7.3M params). Training: Adam (lr $10^{-4}$, weight decay $10^{-4}$), BCEWithLogitsLoss, AMP, ReduceLROnPlateau, early stopping (patience 10), up to 30 epochs on Colab T4. Implementation: \texttt{src/models/densenet121.py}, \texttt{src/models/attention.py}, \texttt{src/train.py}.
+
+\subsection{Hypotheses}\label{sec:hypotheses}
+Single fixed split, so comparisons are descriptive (no formal significance claim):
+\begin{description}
+\item[H1:] BayesShrink improves image quality and classification. Tested by E1 vs.\ E2; accepted if mean PSNR/SSIM E2 $>$ E1 and accuracy/AUC E2 $\ge$ E1.
+\item[H2:] Follicle ROI/\textit{masked} input improves classification by focusing the model on follicles. Tested by E3 vs.\ E4 vs.\ E5; accepted if F1/AUC of E4 or E5 $>$ E3.
+\item[H3:] CBAM matches self-attention accuracy with fewer parameters (more efficient). Tested by E4 vs.\ E6; accepted if accuracy/AUC E6 $\ge$ E4 $-0.5$~pp with fewer parameters and no higher latency.
+\end{description}
+
+\subsection{Experimental design and metrics}\label{sec:design}
+\begin{table}[width=\textwidth,pos=ht]
+\caption{Experiment matrix E1--E6 (from \texttt{experiments/run\_matrix.py}).}\label{tbl:matrix}
+\begin{tabular*}{\tblwidth}{@{}llllL@{}}
+\toprule
+ID & Preprocessing & Segmentation/input & Attention & Tests \\
+\midrule
+E1 & baseline & none / full & self-attention & baseline H1 \\
+E2 & BayesShrink & none / full & self-attention & H1 \\
+E3 & BayesShrink + CLAHE & none / full & self-attention & baseline H2 \\
+E4 & BayesShrink + CLAHE & otsu / roi & self-attention & H2, baseline H3 \\
+E5 & BayesShrink + CLAHE & otsu / masked & self-attention & H2 \\
+E6 & BayesShrink + CLAHE & otsu / roi & cbam & H3 \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+Each run saves checkpoint, plots, \texttt{stdout.log}, and one row in \texttt{experiments/results/results.csv} (including \texttt{total\_params}, \texttt{infer\_ms\_cpu}). Training-free image-quality evidence comes from \texttt{experiments/evaluate\_quality.py} into \texttt{experiments/quality/} (\texttt{quality.csv}, \texttt{summary.txt}, overlay figures).
+PCD-side metrics: PSNR/SSIM, histogram/spectrum, mask overlay, ROI statistics (region count, coverage, mean/max area). Medical-side metrics: accuracy, precision, recall, F1, specificity, AUC, confusion matrix, ROC, Grad-CAM (\texttt{src/gradcam.py}); report false negatives explicitly (costlier for screening).
+
+\section{Results}\label{sec:results}
+% TODO: fill from experiments/results/results.csv and experiments/quality/.
+
+\begin{table}[width=\textwidth,pos=ht]
+\caption{Classification results E1--E6. TODO: fill from \texttt{experiments/results/results.csv}.}\label{tbl:results}
+\begin{tabular*}{\tblwidth}{@{}lcccccc@{}}
+\toprule
+ID & Acc. & F1 & AUC & Params & Latency & Note \\
+\midrule
+E1 & -- & -- & -- & -- & -- & baseline \\
+E2 & -- & -- & -- & -- & -- & + BayesShrink \\
+E3 & -- & -- & -- & -- & -- & + CLAHE \\
+E4 & -- & -- & -- & -- & -- & + ROI Otsu \\
+E5 & -- & -- & -- & -- & -- & + masked Otsu \\
+E6 & -- & -- & -- & -- & -- & + CBAM \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\begin{table}[width=\textwidth,pos=ht]
+\caption{Image-quality evidence (training-free). TODO: fill from \texttt{experiments/quality/summary.txt}.}\label{tbl:quality}
+\begin{tabular*}{\tblwidth}{@{}lccc@{}}
+\toprule
+Comparison & PSNR & SSIM & ROI stats \\
+\midrule
+BayesShrink vs.\ baseline & -- & -- & -- \\
+ROI coverage / region count & -- & -- & -- \\
+\bottomrule
+\end{tabular*}
+\end{table}
+
+\begin{figure}[pos=ht]
+\centering
+% \includegraphics[width=0.9\linewidth]{pipeline.pdf}
+\caption{TODO: pipeline diagram (USG $\rightarrow$ denoise $\rightarrow$ CLAHE $\rightarrow$ segmentation $\rightarrow$ full/ROI/masked $\rightarrow$ DenseNet-121 + attention $\rightarrow$ Grad-CAM).}\label{fig:pipeline}
+\end{figure}
+
+\begin{figure}[pos=ht]
+\centering
+% \includegraphics[width=0.9\linewidth]{gradcam.pdf}
+\caption{TODO: Grad-CAM heatmaps on E4 vs.\ E6 showing focus on follicular regions vs.\ background.}\label{fig:gradcam}
+\end{figure}
+
+\section{Discussion}\label{sec:discussion}
+% TODO: map evidence back to H1--H3 with acceptance criteria from Section~\ref{sec:hypotheses}; discuss FN/FP trade-off for screening; state G2/G3/G1 as limitations and future work (Section~\ref{sec:limits}).
+
+\section{Conclusion}\label{sec:conclusion}
+% TODO: 1 paragraph answering the three problem statements; keep claims within the single-split descriptive scope.
+
+\subsection*{Limitations and future work}\label{sec:limits}
+\begin{enumerate}
+\item No ground-truth masks: segmentation is unsupervised/ROI-supporting (region statistics + qualitative overlay, no clinical Dice).
+\item Single train/val/test split: metric comparisons are descriptive, without statistical-significance claims.
+\item Out of scope and left as future work: multimodal fusion (G1), cross-dataset validation (G2), uncertainty quantification (G3).
+\end{enumerate}
+
+\printcredits
+
+\bibliographystyle{cas-model2-names}
+\bibliography{references}
+
+\end{document}

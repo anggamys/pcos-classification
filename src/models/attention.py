@@ -44,9 +44,9 @@ class SEAttention(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        w = self.squeeze(x).view(B, C)
-        w = self.excitation(w).view(B, C, 1, 1)
-        return x * w.expand_as(x)
+        channel_weights = self.squeeze(x).view(B, C)
+        channel_weights = self.excitation(channel_weights).view(B, C, 1, 1)
+        return x * channel_weights.expand_as(x)
 
 
 class CBAMAttention(nn.Module):
@@ -78,8 +78,8 @@ class ChannelGate(nn.Module):
         B, C, _, _ = x.shape
         avg_out = self.fc(self.avg_pool(x).view(B, C))
         max_out = self.fc(self.max_pool(x).view(B, C))
-        w = self.sigmoid(avg_out + max_out).view(B, C, 1, 1)
-        return x * w.expand_as(x)
+        channel_weights = self.sigmoid(avg_out + max_out).view(B, C, 1, 1)
+        return x * channel_weights.expand_as(x)
 
 
 class SpatialGate(nn.Module):
@@ -91,9 +91,9 @@ class SpatialGate(nn.Module):
     def forward(self, x):
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
-        w = torch.cat([avg_out, max_out], dim=1)
-        w = self.sigmoid(self.conv(w))
-        return x * w
+        spatial_weights = torch.cat([avg_out, max_out], dim=1)
+        spatial_weights = self.sigmoid(self.conv(spatial_weights))
+        return x * spatial_weights
 
 
 class TransformerAttention(nn.Module):

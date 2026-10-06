@@ -11,21 +11,27 @@ def enhance_clahe(pil_image, tiles=8, clip=2.0):
     """Simplified tile-based contrast enhancement (CLAHE-like)."""
     gray = ImageOps.grayscale(pil_image)
     arr = np.array(gray).astype(np.float64)
-    h, w = arr.shape
+    height, width = arr.shape
     out = np.zeros_like(arr)
-    th, tw = max(h // tiles, 1), max(w // tiles, 1)
-    for y0 in range(0, h, th):
-        for x0 in range(0, w, tw):
-            tile = arr[y0 : y0 + th, x0 : x0 + tw]
+    tile_height, tile_width = max(height // tiles, 1), max(width // tiles, 1)
+    for tile_y in range(0, height, tile_height):
+        for tile_x in range(0, width, tile_width):
+            tile = arr[
+                tile_y : tile_y + tile_height, tile_x : tile_x + tile_width
+            ]
             hist, _ = np.histogram(tile, bins=256, range=(0, 255))
             limit = max(clip * tile.size / 256.0, 1.0)
             excess = np.maximum(hist - limit, 0).sum()
             hist = np.minimum(hist, limit) + excess / 256.0
-            cdf = hist.cumsum()
-            cdf = (cdf - cdf.min()) / max(cdf.max() - cdf.min(), 1e-10)
-            lut = cdf * 255.0
-            idx = np.clip(tile.astype(int), 0, 255)
-            out[y0 : y0 + th, x0 : x0 + tw] = lut[idx]
+            cumulative_hist = hist.cumsum()
+            cumulative_hist = (cumulative_hist - cumulative_hist.min()) / max(
+                cumulative_hist.max() - cumulative_hist.min(), 1e-10
+            )
+            lookup_table = cumulative_hist * 255.0
+            pixel_index = np.clip(tile.astype(int), 0, 255)
+            out[tile_y : tile_y + tile_height, tile_x : tile_x + tile_width] = (
+                lookup_table[pixel_index]
+            )
     out = Image.fromarray(out.astype(np.uint8)).convert("RGB")
     return out
 
@@ -43,11 +49,13 @@ def _to_gray_float(pil_image):
 
 
 def psnr(img_a, img_b, max_val=255.0):
-    a = _to_gray_float(img_a)
-    b = _to_gray_float(img_b)
-    if a.shape != b.shape:
-        b = np.array(ImageOps.grayscale(img_b).resize(a.shape[::-1])).astype(np.float64)
-    mse = float(np.mean((a - b) ** 2))
+    image_a = _to_gray_float(img_a)
+    image_b = _to_gray_float(img_b)
+    if image_a.shape != image_b.shape:
+        image_b = np.array(
+            ImageOps.grayscale(img_b).resize(image_a.shape[::-1])
+        ).astype(np.float64)
+    mse = float(np.mean((image_a - image_b) ** 2))
     if mse == 0:
         return float("inf")
     return 10.0 * math.log10(max_val**2 / mse)
@@ -55,25 +63,28 @@ def psnr(img_a, img_b, max_val=255.0):
 
 def ssim(img_a, img_b, max_val=255.0, sigma=1.5):
     """Simplified single-scale SSIM with Gaussian weighting."""
-    a = _to_gray_float(img_a)
-    b = _to_gray_float(img_b)
-    if a.shape != b.shape:
-        b = np.array(ImageOps.grayscale(img_b).resize(a.shape[::-1])).astype(np.float64)
+    image_a = _to_gray_float(img_a)
+    image_b = _to_gray_float(img_b)
+    if image_a.shape != image_b.shape:
+        image_b = np.array(
+            ImageOps.grayscale(img_b).resize(image_a.shape[::-1])
+        ).astype(np.float64)
     c1, c2 = (0.01 * max_val) ** 2, (0.03 * max_val) ** 2
-    mu_a = gaussian_filter(a, sigma)
-    mu_b = gaussian_filter(b, sigma)
+    mu_a = gaussian_filter(image_a, sigma)
+    mu_b = gaussian_filter(image_b, sigma)
     mu_a2, mu_b2, mu_ab = mu_a**2, mu_b**2, mu_a * mu_b
-    var_a = gaussian_filter(a * a, sigma) - mu_a2
-    var_b = gaussian_filter(b * b, sigma) - mu_b2
-    cov_ab = gaussian_filter(a * b, sigma) - mu_ab
-    num = (2 * mu_ab + c1) * (2 * cov_ab + c2)
-    den = (mu_a2 + mu_b2 + c1) * (var_a + var_b + c2)
-    return float(np.mean(num / np.maximum(den, 1e-10)))
+    var_a = gaussian_filter(image_a * image_a, sigma) - mu_a2
+    var_b = gaussian_filter(image_b * image_b, sigma) - mu_b2
+    cov_ab = gaussian_filter(image_a * image_b, sigma) - mu_ab
+    numerator = (2 * mu_ab + c1) * (2 * cov_ab + c2)
+    denominator = (mu_a2 + mu_b2 + c1) * (var_a + var_b + c2)
+    return float(np.mean(numerator / np.maximum(denominator, 1e-10)))
 
 
 def summarize(values):
     arr = np.array(
-        [v for v in values if v is not None and math.isfinite(v)], dtype=float
+        [value for value in values if value is not None and math.isfinite(value)],
+        dtype=float,
     )
     if arr.size == 0:
         return {"n": 0, "mean": 0.0, "std": 0.0, "min": 0.0, "max": 0.0}

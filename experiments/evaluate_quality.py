@@ -74,11 +74,11 @@ def process_one(img_path):
 
 def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
     mask = segment(enhanced, method="otsu")
-    ov = overlay_mask(enhanced, mask)
+    overlay = overlay_mask(enhanced, mask)
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
     for ax, img, title in zip(
         axes,
-        [raw, denoised, enhanced, ov],
+        [raw, denoised, enhanced, overlay],
         ["Raw", "Denoised", "Denoise+CLAHE", "Otsu overlay"],
     ):
         ax.imshow(img)

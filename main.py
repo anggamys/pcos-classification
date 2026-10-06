@@ -213,12 +213,12 @@ def main():
 
     plot_confusion_matrix(
         results["labels"],
-        results["preds"],
+        results["predictions"],
         save_path=f"{args.save_dir}/confusion_matrix.png",
     )
     plot_roc_curve(
-        metrics["fpr"],
-        metrics["tpr"],
+        metrics["false_positive_rate"],
+        metrics["true_positive_rate"],
         metrics["auc"],
         save_path=f"{args.save_dir}/roc_curve.png",
     )

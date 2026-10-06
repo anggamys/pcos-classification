@@ -19,7 +19,7 @@ from torch.amp import autocast
 @torch.no_grad()
 def evaluate_model(model, loader, device):
     model.eval()
-    all_probs = []
+    all_probabilities = []
     all_labels = []
     use_amp = device.type == "cuda"
 
@@ -27,63 +27,73 @@ def evaluate_model(model, loader, device):
         images = images.to(device, non_blocking=True)
         with autocast(device_type=device.type, enabled=use_amp):
             outputs = model(images)
-        probs = torch.sigmoid(outputs).cpu().numpy().flatten()
-        all_probs.extend(probs)
+        probabilities = torch.sigmoid(outputs).cpu().numpy().flatten()
+        all_probabilities.extend(probabilities)
         all_labels.extend(labels.numpy())
 
-    all_probs = np.array(all_probs)
+    all_probabilities = np.array(all_probabilities)
     all_labels = np.array(all_labels)
-    all_preds = (all_probs > 0.5).astype(int)
+    all_predictions = (all_probabilities > 0.5).astype(int)
 
     return {
         "labels": all_labels,
-        "probs": all_probs,
-        "preds": all_preds,
+        "probabilities": all_probabilities,
+        "predictions": all_predictions,
     }
 
 
 def compute_metrics(results):
     labels = results["labels"]
-    preds = results["preds"]
-    probs = results["probs"]
+    predictions = results["predictions"]
+    probabilities = results["probabilities"]
 
-    acc = accuracy_score(labels, preds)
-    prec = precision_score(labels, preds, zero_division=0)
-    rec = recall_score(labels, preds, zero_division=0)
-    f1 = f1_score(labels, preds, zero_division=0)
-    spec = recall_score(labels, preds, pos_label=0, zero_division=0)
+    accuracy = accuracy_score(labels, predictions)
+    precision = precision_score(labels, predictions, zero_division=0)
+    recall = recall_score(labels, predictions, zero_division=0)
+    f1 = f1_score(labels, predictions, zero_division=0)
+    specificity = recall_score(labels, predictions, pos_label=0, zero_division=0)
 
-    fpr, tpr, _ = roc_curve(labels, probs)
-    roc_auc = auc(fpr, tpr)
+    false_positive_rate, true_positive_rate, _ = roc_curve(labels, probabilities)
+    roc_auc = auc(false_positive_rate, true_positive_rate)
 
-    prec_curve, rec_curve, _ = precision_recall_curve(labels, probs)
-    ap = average_precision_score(labels, probs)
+    precision_curve, recall_curve, _ = precision_recall_curve(labels, probabilities)
+    average_precision = average_precision_score(labels, probabilities)
 
     return {
-        "accuracy": acc,
-        "precision": prec,
-        "recall": rec,
+        "accuracy": accuracy,
+        "precision": precision,
+        "recall": recall,
         "f1": f1,
-        "specificity": spec,
+        "specificity": specificity,
         "auc": roc_auc,
-        "average_precision": ap,
-        "fpr": fpr,
-        "tpr": tpr,
-        "prec_curve": prec_curve,
-        "rec_curve": rec_curve,
+        "average_precision": average_precision,
+        "false_positive_rate": false_positive_rate,
+        "true_positive_rate": true_positive_rate,
+        "precision_curve": precision_curve,
+        "recall_curve": recall_curve,
     }
 
 
-def plot_confusion_matrix(labels, preds, save_path=None):
-    cm = confusion_matrix(labels, preds)
+def plot_confusion_matrix(labels, predictions, save_path=None):
+    confusion_values = confusion_matrix(labels, predictions)
     _, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(cm, cmap="Blues")
+    im = ax.imshow(confusion_values, cmap="Blues")
 
-    for i in range(cm.shape[0]):
-        for j in range(cm.shape[1]):
-            color = "white" if cm[i, j] > cm.max() / 2 else "black"
+    for row in range(confusion_values.shape[0]):
+        for col in range(confusion_values.shape[1]):
+            color = (
+                "white"
+                if confusion_values[row, col] > confusion_values.max() / 2
+                else "black"
+            )
             ax.text(
-                j, i, str(cm[i, j]), ha="center", va="center", color=color, fontsize=14
+                col,
+                row,
+                str(confusion_values[row, col]),
+                ha="center",
+                va="center",
+                color=color,
+                fontsize=14,
             )
 
     ax.set_xlabel("Predicted", fontsize=12)
@@ -99,9 +109,15 @@ def plot_confusion_matrix(labels, preds, save_path=None):
     plt.show()
 
 
-def plot_roc_curve(fpr, tpr, auc_val, save_path=None):
+def plot_roc_curve(false_positive_rate, true_positive_rate, auc_value, save_path=None):
     _, ax = plt.subplots(figsize=(6, 5))
-    ax.plot(fpr, tpr, "b-", linewidth=2, label=f"AUC = {auc_val:.4f}")
+    ax.plot(
+        false_positive_rate,
+        true_positive_rate,
+        "b-",
+        linewidth=2,
+        label=f"AUC = {auc_value:.4f}",
+    )
     ax.plot([0, 1], [0, 1], "k--", linewidth=1)
     ax.set_xlabel("False Positive Rate", fontsize=12)
     ax.set_ylabel("True Positive Rate", fontsize=12)
@@ -114,9 +130,15 @@ def plot_roc_curve(fpr, tpr, auc_val, save_path=None):
     plt.show()
 
 
-def plot_pr_curve(prec_curve, rec_curve, ap, save_path=None):
+def plot_pr_curve(precision_curve, recall_curve, average_precision, save_path=None):
     _, ax = plt.subplots(figsize=(6, 5))
-    ax.plot(rec_curve, prec_curve, "b-", linewidth=2, label=f"AP = {ap:.4f}")
+    ax.plot(
+        recall_curve,
+        precision_curve,
+        "b-",
+        linewidth=2,
+        label=f"AP = {average_precision:.4f}",
+    )
     ax.set_xlabel("Recall", fontsize=12)
     ax.set_ylabel("Precision", fontsize=12)
     ax.set_title("Precision-Recall Curve", fontsize=14)
@@ -160,7 +182,7 @@ def print_report(results):
     print(
         classification_report(
             results["labels"],
-            results["preds"],
+            results["predictions"],
             target_names=["Non-Infected", "Infected"],
         )
     )

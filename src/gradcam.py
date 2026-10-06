@@ -104,17 +104,17 @@ def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkp
 
     count = 0
     for images, labels in dataloader:
-        for i in range(min(images.size(0), num_samples - count)):
-            img_tensor = images[i : i + 1].to(device)
-            label = labels[i].item()
+        for sample_index in range(min(images.size(0), num_samples - count)):
+            img_tensor = images[sample_index : sample_index + 1].to(device)
+            label = labels[sample_index].item()
 
             with torch.no_grad():
                 output = model(img_tensor)
-                pred = (torch.sigmoid(output) > 0.5).long().item()
+                prediction = (torch.sigmoid(output) > 0.5).long().item()
 
             cam = gradcam.generate(img_tensor)
 
-            img_display = images[i].cpu() * std + mean
+            img_display = images[sample_index].cpu() * std + mean
             img_display = img_display.permute(1, 2, 0).numpy()
             img_display = np.clip(img_display, 0, 1)
 
@@ -123,7 +123,9 @@ def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkp
             axes[count, 0].axis("off")
 
             axes[count, 1].imshow(cam, cmap="jet")
-            axes[count, 1].set_title(f"Grad-CAM\nPred: {'PCOS' if pred else 'Normal'}")
+            axes[count, 1].set_title(
+                f"Grad-CAM\nPred: {'PCOS' if prediction else 'Normal'}"
+            )
             axes[count, 1].axis("off")
 
             axes[count, 2].imshow(img_display)

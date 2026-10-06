@@ -88,11 +88,11 @@ METRIC_RE = {
 
 
 def parse_metrics(stdout):
-    out = {}
-    for key, rx in METRIC_RE.items():
-        m = rx.search(stdout)
-        out[key] = float(m.group(1)) if m else None
-    return out
+    metrics = {}
+    for key, pattern in METRIC_RE.items():
+        match = pattern.search(stdout)
+        metrics[key] = float(match.group(1)) if match else None
+    return metrics
 
 
 def model_stats(attention, repeats=20):
@@ -105,20 +105,20 @@ def model_stats(attention, repeats=20):
         num_classes=1, pretrained=False, attention_type=attention
     )
     model.eval()
-    total = sum(p.numel() for p in model.parameters())
-    x = torch.randn(1, 3, 224, 224)
+    total_params = sum(p.numel() for p in model.parameters())
+    sample_input = torch.randn(1, 3, 224, 224)
     with torch.no_grad():
         for _ in range(5):
-            _ = model(x)
-        t0 = time.perf_counter()
+            _ = model(sample_input)
+        start_time = time.perf_counter()
         for _ in range(repeats):
-            _ = model(x)
-        dt = (time.perf_counter() - t0) / repeats * 1000.0
-    return total, round(dt, 2)
+            _ = model(sample_input)
+        elapsed_ms = (time.perf_counter() - start_time) / repeats * 1000.0
+    return total_params, round(elapsed_ms, 2)
 
 
-def run_experiment(exp, args, out_root):
-    save_dir = out_root / exp["id"]
+def run_experiment(experiment, args, out_root):
+    save_dir = out_root / experiment["id"]
     save_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
         sys.executable,
@@ -132,18 +132,18 @@ def run_experiment(exp, args, out_root):
         "--save-dir",
         str(save_dir),
         "--attention",
-        exp["attention"],
+        experiment["attention"],
         "--enhance",
-        exp["enhance"],
+        experiment["enhance"],
         "--segment",
-        exp["segment"],
+        experiment["segment"],
         "--input-mode",
-        exp["input_mode"],
+        experiment["input_mode"],
         "--gradcam",
         "--gradcam-samples",
         str(args.gradcam_samples),
     ]
-    if exp["denoise"]:
+    if experiment["denoise"]:
         cmd.append("--denoise")
     log_path = save_dir / "stdout.log"
     proc = subprocess.run(
@@ -151,21 +151,21 @@ def run_experiment(exp, args, out_root):
     )
     log_path.write_text(proc.stdout + "\n\n===== STDERR =====\n" + proc.stderr)
     result = {
-        "id": exp["id"],
-        "desc": exp["desc"],
-        "denoise": exp["denoise"],
-        "enhance": exp["enhance"],
-        "segment": exp["segment"],
-        "input_mode": exp["input_mode"],
-        "attention": exp["attention"],
+        "id": experiment["id"],
+        "desc": experiment["desc"],
+        "denoise": experiment["denoise"],
+        "enhance": experiment["enhance"],
+        "segment": experiment["segment"],
+        "input_mode": experiment["input_mode"],
+        "attention": experiment["attention"],
         "returncode": proc.returncode,
     }
     result.update(parse_metrics(proc.stdout))
-    total_params, infer_ms = model_stats(exp["attention"])
+    total_params, infer_ms = model_stats(experiment["attention"])
     result["total_params"] = total_params
     result["infer_ms_cpu"] = infer_ms
     status = "OK" if proc.returncode == 0 else "FAIL"
-    print(f"[{status}] {exp['id']}: {exp['desc']}")
+    print(f"[{status}] {experiment['id']}: {experiment['desc']}")
     return result
 
 
@@ -180,11 +180,15 @@ def main():
     args = parser.parse_args()
 
     only = {s.strip() for s in args.only.split(",") if s.strip()}
-    selected = [e for e in EXPERIMENTS if not only or e["id"] in only]
+    selected = [
+        experiment
+        for experiment in EXPERIMENTS
+        if not only or experiment["id"] in only
+    ]
     out_root = PROJECT_ROOT / args.out_dir
     out_root.mkdir(parents=True, exist_ok=True)
 
-    rows = [run_experiment(e, args, out_root) for e in selected]
+    rows = [run_experiment(experiment, args, out_root) for experiment in selected]
     csv_path = out_root / "results.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))

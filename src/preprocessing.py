@@ -11,12 +11,12 @@ def bayes_shrink_denoise(channel, wavelet="db4", level=3):
     denoised_coeffs = [coeffs[0]]
     for detail_level in coeffs[1:]:
         denoised_detail = []
-        for c in detail_level:
-            var = np.mean(c**2)
-            sigma_x = max(np.sqrt(max(var - sigma**2, 0)), 1e-10)
+        for detail_coeff in detail_level:
+            variance = np.mean(detail_coeff**2)
+            sigma_x = max(np.sqrt(max(variance - sigma**2, 0)), 1e-10)
             threshold = sigma**2 / sigma_x
-            denoised_c = pywt.threshold(c, threshold, mode="soft")
-            denoised_detail.append(denoised_c)
+            denoised_coeff = pywt.threshold(detail_coeff, threshold, mode="soft")
+            denoised_detail.append(denoised_coeff)
         denoised_coeffs.append(denoised_detail)
 
     return pywt.waverec2(denoised_coeffs, wavelet)
@@ -27,7 +27,10 @@ def wavelet_denoise(pil_image):
 
     if img.ndim == 3 and img.shape[2] == 3:
         denoised = np.stack(
-            [np.clip(bayes_shrink_denoise(img[:, :, i]), 0, 1) for i in range(3)],
+            [
+                np.clip(bayes_shrink_denoise(img[:, :, channel_index]), 0, 1)
+                for channel_index in range(3)
+            ],
             axis=-1,
         )
     else:

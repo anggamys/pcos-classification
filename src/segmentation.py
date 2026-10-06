@@ -8,6 +8,8 @@ grayscale -> threshold (Otsu or adaptive mean) -> invert to dark regions ->
 morphological cleanup -> connected components -> size filtering.
 """
 
+from typing import cast
+
 import numpy as np
 from PIL import Image, ImageOps
 from scipy import ndimage as ndi
@@ -46,33 +48,44 @@ def adaptive_mean_threshold(gray, window=31, offset=7.0):
 
 def _disk(radius):
     r = int(max(radius, 1))
-    y, x = np.ogrid[-r:r + 1, -r:r + 1]
+    y, x = np.ogrid[-r : r + 1, -r : r + 1]
     return (x * x + y * y) <= r * r
 
 
-def cleanup_mask(mask, open_radius=2, close_radius=3, min_area=80,
-                 remove_border=True):
+def _label_mask(mask):
+    return cast(tuple[np.ndarray, int], ndi.label(mask))
+
+
+def cleanup_mask(mask, open_radius=2, close_radius=3, min_area=80, remove_border=True):
     cleaned = ndi.binary_opening(mask, structure=_disk(open_radius))
     cleaned = ndi.binary_closing(cleaned, structure=_disk(close_radius))
-    labeled, _ = ndi.label(cleaned)
-    if labeled.max() == 0:
+    labeled, num_labels = _label_mask(cleaned)
+    if num_labels == 0:
         return np.zeros_like(mask, dtype=bool)
     if remove_border:
-        border_ids = set(np.unique(labeled[0, :])) | set(np.unique(labeled[-1, :]))
-        border_ids |= set(np.unique(labeled[:, 0])) | set(np.unique(labeled[:, -1]))
+        border_ids = set(np.unique(labeled[0, :]).tolist())
+        border_ids.update(np.unique(labeled[-1, :]).tolist())
+        border_ids.update(np.unique(labeled[:, 0]).tolist())
+        border_ids.update(np.unique(labeled[:, -1]).tolist())
         border_ids.discard(0)
         for bid in border_ids:
             labeled[labeled == bid] = 0
-        labeled, _ = ndi.label(labeled > 0)
-        if labeled.max() == 0:
+        labeled, num_labels = _label_mask(labeled > 0)
+        if num_labels == 0:
             return np.zeros_like(mask, dtype=bool)
-    sizes = ndi.sum(np.ones_like(labeled), labeled, range(1, labeled.max() + 1))
+    sizes = ndi.sum(np.ones_like(labeled), labeled, range(1, num_labels + 1))
     keep = {i + 1 for i, s in enumerate(sizes) if s >= min_area}
     return np.isin(labeled, list(keep)) if keep else np.zeros_like(mask, dtype=bool)
 
 
-def segment_otsu(pil_image, open_radius=2, close_radius=3, min_area=80,
-                 max_coverage=0.5, fallback_percentile=15.0):
+def segment_otsu(
+    pil_image,
+    open_radius=2,
+    close_radius=3,
+    min_area=80,
+    max_coverage=0.5,
+    fallback_percentile=15.0,
+):
     gray = to_grayscale_array(pil_image)
     thresh = otsu_threshold(gray)
     mask = cleanup_mask(gray < thresh, open_radius, close_radius, min_area)
@@ -83,8 +96,9 @@ def segment_otsu(pil_image, open_radius=2, close_radius=3, min_area=80,
     return mask
 
 
-def segment_adaptive(pil_image, window=31, offset=7.0,
-                     open_radius=2, close_radius=3, min_area=80):
+def segment_adaptive(
+    pil_image, window=31, offset=7.0, open_radius=2, close_radius=3, min_area=80
+):
     gray = to_grayscale_array(pil_image)
     local_thresh = adaptive_mean_threshold(gray, window=window, offset=offset)
     dark = gray < local_thresh
@@ -104,11 +118,16 @@ def segment(pil_image, method="otsu", **kwargs):
 
 def analyze_regions(mask):
     mask = np.asarray(mask, dtype=bool)
-    labeled, num = ndi.label(mask)
+    labeled, num = _label_mask(mask)
     total = mask.size
     if num == 0:
-        return {"num_regions": 0, "coverage": 0.0, "mean_area": 0.0,
-                "max_area": 0.0, "bbox": None}
+        return {
+            "num_regions": 0,
+            "coverage": 0.0,
+            "mean_area": 0.0,
+            "max_area": 0.0,
+            "bbox": None,
+        }
     sizes = ndi.sum(np.ones_like(labeled), labeled, range(1, num + 1))
     objects = ndi.find_objects(labeled)
     bboxes = []
@@ -159,6 +178,8 @@ def apply_masked(pil_image, mask, background=0):
 def overlay_mask(pil_image, mask, color=(255, 0, 0), alpha=90):
     base = pil_image.convert("RGBA")
     overlay = Image.new("RGBA", base.size, color + (0,))
-    alpha_layer = Image.fromarray((np.asarray(mask, dtype=bool) * alpha).astype(np.uint8))
+    alpha_layer = Image.fromarray(
+        (np.asarray(mask, dtype=bool) * alpha).astype(np.uint8)
+    )
     overlay.putalpha(alpha_layer)
     return Image.alpha_composite(base, overlay).convert("RGB")

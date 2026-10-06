@@ -1,9 +1,8 @@
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn.functional as F
-import numpy as np
-import matplotlib.pyplot as plt
 from PIL import Image
-from torchvision import transforms
 
 
 class GradCAM:
@@ -32,11 +31,18 @@ class GradCAM:
         self.model.zero_grad()
         output[0, target_class].backward()
 
+        if self.gradients is None or self.activations is None:
+            raise RuntimeError(
+                "Grad-CAM hooks did not capture gradients and activations"
+            )
+
         weights = self.gradients.mean(dim=(2, 3), keepdim=True)
         cam = (weights * self.activations).sum(dim=1, keepdim=True)
         cam = F.relu(cam)
 
-        cam = F.interpolate(cam, size=input_tensor.shape[2:], mode="bilinear", align_corners=False)
+        cam = F.interpolate(
+            cam, size=input_tensor.shape[2:], mode="bilinear", align_corners=False
+        )
         cam = cam - cam.min()
         cam = cam / (cam.max() + 1e-8)
 
@@ -48,7 +54,7 @@ class GradCAM:
         if isinstance(image, Image.Image):
             image = np.array(image)
 
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+        _, axes = plt.subplots(1, 3, figsize=(15, 5))
 
         axes[0].imshow(image)
         axes[0].set_title("Original")
@@ -92,14 +98,14 @@ def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkp
     mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
     std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
 
-    fig, axes = plt.subplots(num_samples, 3, figsize=(15, 5 * num_samples))
+    _, axes = plt.subplots(num_samples, 3, figsize=(15, 5 * num_samples))
     if num_samples == 1:
         axes = axes.reshape(1, -1)
 
     count = 0
     for images, labels in dataloader:
         for i in range(min(images.size(0), num_samples - count)):
-            img_tensor = images[i:i+1].to(device)
+            img_tensor = images[i : i + 1].to(device)
             label = labels[i].item()
 
             with torch.no_grad():

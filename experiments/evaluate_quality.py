@@ -20,6 +20,7 @@ import csv
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,11 +29,12 @@ from PIL import Image
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 import sys
+
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.preprocessing import wavelet_denoise  # noqa: E402
-from src.segmentation import segment, analyze_regions, overlay_mask  # noqa: E402
-from src.image_quality import enhance, psnr, ssim, summarize  # noqa: E402
+from src.image_quality import enhance, psnr, ssim, summarize
+from src.preprocessing import wavelet_denoise
+from src.segmentation import analyze_regions, overlay_mask, segment
 
 CLASSES = ["infected", "noninfected"]
 SEG_METHODS = ["otsu", "adaptive"]
@@ -74,9 +76,11 @@ def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
     mask = segment(enhanced, method="otsu")
     ov = overlay_mask(enhanced, mask)
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
-    for ax, img, title in zip(axes,
-                              [raw, denoised, enhanced, ov],
-                              ["Raw", "Denoised", "Denoise+CLAHE", "Otsu overlay"]):
+    for ax, img, title in zip(
+        axes,
+        [raw, denoised, enhanced, ov],
+        ["Raw", "Denoised", "Denoise+CLAHE", "Otsu overlay"],
+    ):
         ax.imshow(img)
         ax.set_title(title, fontsize=11)
         ax.axis("off")
@@ -91,8 +95,9 @@ def main():
     parser.add_argument("--samples-per-class", type=int, default=100)
     parser.add_argument("--out-dir", default="experiments/quality")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--figures", type=int, default=3,
-                        help="Sample overlay figures saved per class")
+    parser.add_argument(
+        "--figures", type=int, default=3, help="Sample overlay figures saved per class"
+    )
     args = parser.parse_args()
 
     out_root = PROJECT_ROOT / args.out_dir
@@ -125,8 +130,10 @@ def main():
             if key in ("file", "class"):
                 continue
             s = summarize([r[key] for r in subset])
-            lines.append(f"  {key}: mean={s['mean']:.4f} std={s['std']:.4f} "
-                         f"min={s['min']:.4f} max={s['max']:.4f}")
+            lines.append(
+                f"  {key}: mean={s['mean']:.4f} std={s['std']:.4f} "
+                f"min={s['min']:.4f} max={s['max']:.4f}"
+            )
     summary = "\n".join(lines)
     (out_root / "summary.txt").write_text(summary)
     print("\n" + summary)

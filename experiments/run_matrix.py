@@ -21,24 +21,60 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 EXPERIMENTS = [
-    {"id": "E1", "denoise": False, "enhance": "none", "segment": "none",
-     "input_mode": "full", "attention": "self_attention",
-     "desc": "Baseline tanpa denoise"},
-    {"id": "E2", "denoise": True, "enhance": "none", "segment": "none",
-     "input_mode": "full", "attention": "self_attention",
-     "desc": "BayesShrink wavelet denoising"},
-    {"id": "E3", "denoise": True, "enhance": "clahe", "segment": "none",
-     "input_mode": "full", "attention": "self_attention",
-     "desc": "Denoise + CLAHE enhancement"},
-    {"id": "E4", "denoise": True, "enhance": "clahe", "segment": "otsu",
-     "input_mode": "roi", "attention": "self_attention",
-     "desc": "Preprocessing terbaik + ROI crop Otsu"},
-    {"id": "E5", "denoise": True, "enhance": "clahe", "segment": "otsu",
-     "input_mode": "masked", "attention": "self_attention",
-     "desc": "Preprocessing terbaik + masked input Otsu"},
-    {"id": "E6", "denoise": True, "enhance": "clahe", "segment": "otsu",
-     "input_mode": "roi", "attention": "cbam",
-     "desc": "Konfigurasi terbaik + CBAM attention"},
+    {
+        "id": "E1",
+        "denoise": False,
+        "enhance": "none",
+        "segment": "none",
+        "input_mode": "full",
+        "attention": "self_attention",
+        "desc": "Baseline tanpa denoise",
+    },
+    {
+        "id": "E2",
+        "denoise": True,
+        "enhance": "none",
+        "segment": "none",
+        "input_mode": "full",
+        "attention": "self_attention",
+        "desc": "BayesShrink wavelet denoising",
+    },
+    {
+        "id": "E3",
+        "denoise": True,
+        "enhance": "clahe",
+        "segment": "none",
+        "input_mode": "full",
+        "attention": "self_attention",
+        "desc": "Denoise + CLAHE enhancement",
+    },
+    {
+        "id": "E4",
+        "denoise": True,
+        "enhance": "clahe",
+        "segment": "otsu",
+        "input_mode": "roi",
+        "attention": "self_attention",
+        "desc": "Preprocessing terbaik + ROI crop Otsu",
+    },
+    {
+        "id": "E5",
+        "denoise": True,
+        "enhance": "clahe",
+        "segment": "otsu",
+        "input_mode": "masked",
+        "attention": "self_attention",
+        "desc": "Preprocessing terbaik + masked input Otsu",
+    },
+    {
+        "id": "E6",
+        "denoise": True,
+        "enhance": "clahe",
+        "segment": "otsu",
+        "input_mode": "roi",
+        "attention": "cbam",
+        "desc": "Konfigurasi terbaik + CBAM attention",
+    },
 ]
 
 METRIC_RE = {
@@ -62,9 +98,12 @@ def parse_metrics(stdout):
 def model_stats(attention, repeats=20):
     """Total params + CPU inference latency (efficiency evidence for H3)."""
     import torch
+
     from src.models.densenet121 import DenseNet121Attention
-    model = DenseNet121Attention(num_classes=1, pretrained=False,
-                                attention_type=attention)
+
+    model = DenseNet121Attention(
+        num_classes=1, pretrained=False, attention_type=attention
+    )
     model.eval()
     total = sum(p.numel() for p in model.parameters())
     x = torch.randn(1, 3, 224, 224)
@@ -81,27 +120,46 @@ def model_stats(attention, repeats=20):
 def run_experiment(exp, args, out_root):
     save_dir = out_root / exp["id"]
     save_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [sys.executable, str(PROJECT_ROOT / "main.py"),
-           "--data-dir", args.data_dir,
-           "--epochs", str(args.epochs),
-           "--batch-size", str(args.batch_size),
-           "--save-dir", str(save_dir),
-           "--attention", exp["attention"],
-           "--enhance", exp["enhance"],
-           "--segment", exp["segment"],
-           "--input-mode", exp["input_mode"],
-           "--gradcam", "--gradcam-samples", str(args.gradcam_samples)]
+    cmd = [
+        sys.executable,
+        str(PROJECT_ROOT / "main.py"),
+        "--data-dir",
+        args.data_dir,
+        "--epochs",
+        str(args.epochs),
+        "--batch-size",
+        str(args.batch_size),
+        "--save-dir",
+        str(save_dir),
+        "--attention",
+        exp["attention"],
+        "--enhance",
+        exp["enhance"],
+        "--segment",
+        exp["segment"],
+        "--input-mode",
+        exp["input_mode"],
+        "--gradcam",
+        "--gradcam-samples",
+        str(args.gradcam_samples),
+    ]
     if exp["denoise"]:
         cmd.append("--denoise")
     log_path = save_dir / "stdout.log"
-    proc = subprocess.run(cmd, cwd=str(PROJECT_ROOT),
-                          capture_output=True, text=True)
+    proc = subprocess.run(
+        cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False
+    )
     log_path.write_text(proc.stdout + "\n\n===== STDERR =====\n" + proc.stderr)
-    result = {"id": exp["id"], "desc": exp["desc"],
-              "denoise": exp["denoise"], "enhance": exp["enhance"],
-              "segment": exp["segment"], "input_mode": exp["input_mode"],
-              "attention": exp["attention"],
-              "returncode": proc.returncode}
+    result = {
+        "id": exp["id"],
+        "desc": exp["desc"],
+        "denoise": exp["denoise"],
+        "enhance": exp["enhance"],
+        "segment": exp["segment"],
+        "input_mode": exp["input_mode"],
+        "attention": exp["attention"],
+        "returncode": proc.returncode,
+    }
     result.update(parse_metrics(proc.stdout))
     total_params, infer_ms = model_stats(exp["attention"])
     result["total_params"] = total_params
@@ -118,8 +176,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--gradcam-samples", type=int, default=5)
     parser.add_argument("--out-dir", default="experiments/results")
-    parser.add_argument("--only", default="",
-                        help="Comma-separated subset, e.g. E1,E2")
+    parser.add_argument("--only", default="", help="Comma-separated subset, e.g. E1,E2")
     args = parser.parse_args()
 
     only = {s.strip() for s in args.only.split(",") if s.strip()}

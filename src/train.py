@@ -2,10 +2,10 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn as nn
+from torch import nn
+from torch.amp import GradScaler, autocast
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 
 
@@ -73,10 +73,10 @@ def train(model, train_loader, val_loader, config):
     scaler = GradScaler(enabled=use_amp)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = Adam(model.parameters(), lr=config["lr"],
-                     weight_decay=config["weight_decay"])
-    scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=5,
-                                  factor=0.5)
+    optimizer = Adam(
+        model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
+    )
+    scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=5, factor=0.5)
 
     best_val_loss = float("inf")
     patience_counter = 0
@@ -90,7 +90,9 @@ def train(model, train_loader, val_loader, config):
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         total_mem = torch.cuda.get_device_properties(0).total_mem / 1024**3
         print(f"VRAM: {total_mem:.1f} GB | AMP: enabled (float16)")
-    print(f"Epochs: {config['epochs']}, LR: {config['lr']}, Batch: {config['batch_size']}")
+    print(
+        f"Epochs: {config['epochs']}, LR: {config['lr']}, Batch: {config['batch_size']}"
+    )
     print("-" * 60)
 
     for epoch in range(config["epochs"]):
@@ -109,25 +111,30 @@ def train(model, train_loader, val_loader, config):
         history["val_acc"].append(val_acc)
 
         elapsed = time.time() - start
-        print(f"Epoch {epoch+1}/{config['epochs']} ({elapsed:.1f}s) - "
-              f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} - "
-              f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}")
+        print(
+            f"Epoch {epoch + 1}/{config['epochs']} ({elapsed:.1f}s) - "
+            f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} - "
+            f"Val Loss: {val_loss:.4f} Acc: {val_acc:.4f}"
+        )
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
-            torch.save({
-                "epoch": epoch,
-                "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
-                "val_loss": val_loss,
-                "val_acc": val_acc,
-            }, save_dir / "best_model.pth")
+            torch.save(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "val_loss": val_loss,
+                    "val_acc": val_acc,
+                },
+                save_dir / "best_model.pth",
+            )
             print(f"  -> Saved best model (val_loss: {val_loss:.4f})")
         else:
             patience_counter += 1
             if patience_counter >= config.get("patience", 10):
-                print(f"Early stopping at epoch {epoch+1}")
+                print(f"Early stopping at epoch {epoch + 1}")
                 break
 
     return history

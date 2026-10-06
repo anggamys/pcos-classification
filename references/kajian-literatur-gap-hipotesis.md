@@ -7,10 +7,12 @@ dari dua arah berbeda: Tiwari dkk. lewat arsitektur ringan ber-attention,
 Sundari dkk. lewat optimasi dan interpretabilitas. Dokumen ini mengisahkan apa
 yang mereka capai, benang apa yang mereka tinggalkan, hipotesis apa yang lahir
 dari benang itu, dan penelitian seperti apa yang akan menuntaskannya. Disusun
-sebagai bahan pertahanan topik tugas akhir di hadapan dosen; menjawab empat
-pertanyaan: (1) apa yang dibahas dua literatur terdahulu, (2) apa gap yang
-ada, (3) hipotesis apa yang diangkat dari kekurangan kedua artikel, dan
-(4) penelitian seperti apa yang akan dijalankan.
+sebagai bahan pertahanan topik tugas akhir di hadapan dosen, dokumen ini
+menjawab empat pertanyaan secara berurutan: pertama, apa yang sebenarnya
+dibahas oleh dua literatur terdahulu; kedua, celah (gap) apa yang tersisa
+dari keduanya; ketiga, hipotesis apa yang dapat diangkat dari kekurangan
+kedua artikel tersebut; dan keempat, penelitian seperti apa yang akan
+dijalankan untuk menjawabnya.
 
 Judul kerja: **Pengaruh Wavelet Denoising dan Segmentasi Folikel terhadap
 Klasifikasi PCOS dengan DenseNet-121 + Attention dan Grad-CAM**.

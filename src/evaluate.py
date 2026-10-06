@@ -1,12 +1,19 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.amp import autocast
 from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, roc_curve, auc, classification_report,
-    precision_recall_curve, average_precision_score,
+    accuracy_score,
+    auc,
+    average_precision_score,
+    classification_report,
+    confusion_matrix,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_curve,
 )
-import matplotlib.pyplot as plt
+from torch.amp import autocast
 
 
 @torch.no_grad()
@@ -69,13 +76,15 @@ def compute_metrics(results):
 
 def plot_confusion_matrix(labels, preds, save_path=None):
     cm = confusion_matrix(labels, preds)
-    fig, ax = plt.subplots(figsize=(6, 5))
+    _, ax = plt.subplots(figsize=(6, 5))
     im = ax.imshow(cm, cmap="Blues")
 
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
             color = "white" if cm[i, j] > cm.max() / 2 else "black"
-            ax.text(j, i, str(cm[i, j]), ha="center", va="center", color=color, fontsize=14)
+            ax.text(
+                j, i, str(cm[i, j]), ha="center", va="center", color=color, fontsize=14
+            )
 
     ax.set_xlabel("Predicted", fontsize=12)
     ax.set_ylabel("True", fontsize=12)
@@ -91,7 +100,7 @@ def plot_confusion_matrix(labels, preds, save_path=None):
 
 
 def plot_roc_curve(fpr, tpr, auc_val, save_path=None):
-    fig, ax = plt.subplots(figsize=(6, 5))
+    _, ax = plt.subplots(figsize=(6, 5))
     ax.plot(fpr, tpr, "b-", linewidth=2, label=f"AUC = {auc_val:.4f}")
     ax.plot([0, 1], [0, 1], "k--", linewidth=1)
     ax.set_xlabel("False Positive Rate", fontsize=12)
@@ -106,7 +115,7 @@ def plot_roc_curve(fpr, tpr, auc_val, save_path=None):
 
 
 def plot_pr_curve(prec_curve, rec_curve, ap, save_path=None):
-    fig, ax = plt.subplots(figsize=(6, 5))
+    _, ax = plt.subplots(figsize=(6, 5))
     ax.plot(rec_curve, prec_curve, "b-", linewidth=2, label=f"AP = {ap:.4f}")
     ax.set_xlabel("Recall", fontsize=12)
     ax.set_ylabel("Precision", fontsize=12)
@@ -120,7 +129,7 @@ def plot_pr_curve(prec_curve, rec_curve, ap, save_path=None):
 
 
 def plot_training_history(history, save_path=None):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    _, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     ax1.plot(history["train_loss"], label="Train Loss")
     ax1.plot(history["val_loss"], label="Val Loss")
@@ -148,7 +157,10 @@ def print_report(results):
     print("\n" + "=" * 50)
     print("CLASSIFICATION REPORT")
     print("=" * 50)
-    print(classification_report(
-        results["labels"], results["preds"],
-        target_names=["Non-Infected", "Infected"]
-    ))
+    print(
+        classification_report(
+            results["labels"],
+            results["preds"],
+            target_names=["Non-Infected", "Infected"],
+        )
+    )

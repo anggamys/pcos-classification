@@ -4,7 +4,6 @@ import torch
 
 from src.dataset import create_dataloaders
 from src.models.densenet121 import DenseNet121Attention
-from src.models.efficientnet_b3 import EfficientNetB3Attention
 from src.train import train
 from src.evaluate import (
     evaluate_model, compute_metrics, plot_confusion_matrix,
@@ -14,7 +13,8 @@ from src.evaluate import (
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="PCOS Classification using Deep Learning"
+        description="Pengaruh Wavelet Denoising dan Segmentasi Folikel "
+                    "terhadap Klasifikasi PCOS dengan DenseNet-121 + Attention"
     )
 
     parser.add_argument("--data-dir", type=str, default="datasets",
@@ -35,43 +35,40 @@ def parse_args():
                         help="Directory to save checkpoints (default: checkpoints)")
     parser.add_argument("--denoise", action="store_true",
                         help="Enable wavelet denoising preprocessing")
+    parser.add_argument("--enhance", type=str, default="none",
+                        choices=["none", "clahe"],
+                        help="Contrast enhancement (default: none)")
+    parser.add_argument("--segment", type=str, default="none",
+                        choices=["none", "otsu", "adaptive"],
+                        help="Follicle segmentation method (default: none)")
+    parser.add_argument("--input-mode", type=str, default="full",
+                        choices=["full", "roi", "masked"],
+                        help="Model input: full image, ROI crop, or masked (default: full)")
+    parser.add_argument("--seg-pad", type=int, default=8,
+                        help="Padding around ROI crop in pixels (default: 8)")
     parser.add_argument("--no-pretrained", action="store_true",
                         help="Disable ImageNet pretrained weights")
     parser.add_argument("--num-workers", type=int, default=2,
                         help="DataLoader num_workers (default: 2)")
 
-    parser.add_argument("--model", type=str, default="densenet121",
-                        choices=["densenet121", "efficientnet_b3"],
-                        help="Model architecture (default: densenet121)")
     parser.add_argument("--attention", type=str, default="self_attention",
                         choices=["self_attention", "se_net", "cbam", "transformer"],
                         help="Attention mechanism (default: self_attention)")
     parser.add_argument("--dropout", type=float, default=0.3,
                         help="Dropout rate (default: 0.3)")
-    parser.add_argument("--optimize", action="store_true",
-                        help="Run Bayesian optimization with Optuna")
-    parser.add_argument("--n-trials", type=int, default=20,
-                        help="Number of Optuna trials (default: 20)")
     parser.add_argument("--gradcam", action="store_true",
                         help="Generate Grad-CAM visualization")
     parser.add_argument("--gradcam-samples", type=int, default=5,
                         help="Number of Grad-CAM samples (default: 5)")
-    parser.add_argument("--smote", action="store_true",
-                        help="Apply SMOTE for class imbalance")
 
     return parser.parse_args()
 
 
-def get_model(model_name, pretrained=True, dropout=0.3, attention_type="self_attention"):
-    if model_name == "efficientnet_b3":
-        return EfficientNetB3Attention(
-            num_classes=1, pretrained=pretrained, dropout=dropout
-        )
-    else:
-        return DenseNet121Attention(
-            num_classes=1, pretrained=pretrained, dropout=dropout,
-            attention_type=attention_type
-        )
+def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
+    return DenseNet121Attention(
+        num_classes=1, pretrained=pretrained, dropout=dropout,
+        attention_type=attention_type
+    )
 
 
 def main():
@@ -87,12 +84,16 @@ def main():
         "patience": args.patience,
         "save_dir": args.save_dir,
         "denoise": args.denoise,
+        "enhance": args.enhance,
+        "segment": args.segment,
+        "input_mode": args.input_mode,
+        "seg_pad": args.seg_pad,
     }
 
     print("Config:")
     for k, v in config.items():
         print(f"  {k}: {v}")
-    print(f"  model: {args.model}")
+    print("  model: densenet121")
     print(f"  attention: {args.attention}")
     print(f"  dropout: {args.dropout}")
     print()
@@ -110,6 +111,10 @@ def main():
         batch_size=config["batch_size"],
         image_size=config["image_size"],
         denoise=config["denoise"],
+        enhance=config["enhance"],
+        segment=config["segment"],
+        input_mode=config["input_mode"],
+        seg_pad=config["seg_pad"],
         num_workers=args.num_workers,
     )
 
@@ -119,26 +124,9 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if args.optimize:
-        print("\nRunning Bayesian Optimization...")
-        from src.optimize import run_optuna
-        best_params = run_optuna(
-            model_class=lambda **kw: get_model(args.model, pretrained=not args.no_pretrained,
-                                                attention_type=args.attention, **kw),
-            train_loader=train_loader,
-            val_loader=val_loader,
-            device=device,
-            config_base=config,
-            n_trials=args.n_trials,
-        )
-        config["lr"] = best_params["lr"]
-        config["weight_decay"] = best_params["weight_decay"]
-        args.dropout = best_params["dropout"]
-        args.batch_size = best_params["batch_size"]
-        print(f"\nBest params: {best_params}")
-
-    print(f"\nInitializing {args.model} with {args.attention} attention...")
-    model = get_model(args.model, pretrained=not args.no_pretrained,
+    print("\nInitializing densenet121 with "
+          f"{args.attention} attention...")
+    model = get_model(pretrained=not args.no_pretrained,
                       dropout=args.dropout, attention_type=args.attention)
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)

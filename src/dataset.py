@@ -7,10 +7,16 @@ from PIL import Image
 
 
 class PCOSDataset(Dataset):
-    def __init__(self, root_dir, transform=None, denoise=False):
+    def __init__(self, root_dir, transform=None, denoise=False,
+                 enhance="none", segment="none", input_mode="full",
+                 seg_pad=8):
         self.root_dir = Path(root_dir)
         self.transform = transform
         self.denoise = denoise
+        self.enhance = enhance
+        self.segment = segment
+        self.input_mode = input_mode
+        self.seg_pad = seg_pad
         self.samples = []
 
         for label, subdir in enumerate(["noninfected", "infected"]):
@@ -25,9 +31,21 @@ class PCOSDataset(Dataset):
         img_path, label = self.samples[idx]
         image = Image.open(img_path).convert("RGB")
 
+        if self.enhance != "none":
+            from .image_quality import enhance
+            image = enhance(image, method=self.enhance)
+
         if self.denoise:
             from .preprocessing import wavelet_denoise
             image = wavelet_denoise(image)
+
+        if self.input_mode in ("roi", "masked") or self.segment != "none":
+            from .segmentation import segment, apply_roi_crop, apply_masked
+            mask = segment(image, method=self.segment)
+            if self.input_mode == "roi":
+                image = apply_roi_crop(image, mask, pad=self.seg_pad)
+            elif self.input_mode == "masked":
+                image = apply_masked(image, mask)
 
         if self.transform:
             image = self.transform(image)
@@ -73,11 +91,14 @@ def get_transforms(train=True, image_size=224):
 
 def create_dataloaders(root_dir, batch_size=32, image_size=224,
                        train_ratio=0.7, val_ratio=0.15, denoise=False,
-                       num_workers=4):
+                       enhance="none", segment="none", input_mode="full",
+                       seg_pad=8, num_workers=4):
     train_transform = get_transforms(train=True, image_size=image_size)
     val_transform = get_transforms(train=False, image_size=image_size)
 
-    full_dataset = PCOSDataset(root_dir, transform=None, denoise=denoise)
+    full_dataset = PCOSDataset(root_dir, transform=None, denoise=denoise,
+                             enhance=enhance, segment=segment,
+                             input_mode=input_mode, seg_pad=seg_pad)
 
     total = len(full_dataset)
     indices = torch.randperm(total, generator=torch.Generator().manual_seed(42))

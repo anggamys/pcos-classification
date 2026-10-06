@@ -3,3 +3,6 @@
 
 # Unignore this file
 !.gitignore
+
+# Unignore curated study document (versioned)
+!kajian-literatur-gap-hipotesis.md

@@ -16,9 +16,7 @@ def enhance_clahe(pil_image, tiles=8, clip=2.0):
     tile_height, tile_width = max(height // tiles, 1), max(width // tiles, 1)
     for tile_y in range(0, height, tile_height):
         for tile_x in range(0, width, tile_width):
-            tile = arr[
-                tile_y : tile_y + tile_height, tile_x : tile_x + tile_width
-            ]
+            tile = arr[tile_y : tile_y + tile_height, tile_x : tile_x + tile_width]
             hist, _ = np.histogram(tile, bins=256, range=(0, 255))
             limit = max(clip * tile.size / 256.0, 1.0)
             excess = np.maximum(hist - limit, 0).sum()

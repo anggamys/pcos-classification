@@ -39,17 +39,21 @@ class PCOSDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
 
         if self.enhance != "none":
-            from .image_quality import enhance
+            from .preprocessing.quality import enhance
 
             image = enhance(image, method=self.enhance)
 
         if self.denoise:
-            from .preprocessing import wavelet_denoise
+            from .preprocessing.wavelet import wavelet_denoise
 
             image = wavelet_denoise(image)
 
         if self.input_mode in ("roi", "masked") or self.segment != "none":
-            from .segmentation import apply_masked, apply_roi_crop, segment
+            from .preprocessing.segmentation import (
+                apply_masked,
+                apply_roi_crop,
+                segment,
+            )
 
             mask = segment(image, method=self.segment)
             if self.input_mode == "roi":

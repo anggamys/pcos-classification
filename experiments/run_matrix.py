@@ -1,80 +1,64 @@
 """Run the 6-experiment matrix for the dual-course final project.
 
-Each experiment calls main.py as a subprocess with its own --save-dir so
-checkpoints, plots, and logs stay separated. Metrics printed by main.py
-(Accuracy / AUC lines) are parsed from stdout into results.csv.
+Configuration lives in a YAML file (single source of truth):
 
-Usage:
-    python experiments/run_matrix.py --data-dir datasets --epochs 30
-    python experiments/run_matrix.py --data-dir /path/to/data --epochs 30 --only E1,E2
+    python experiments/run_matrix.py --config experiments/experiments.yml
+    python experiments/run_matrix.py --config experiments/experiments.yml --only E1,E2
+
+CLI flags (--data-dir, --epochs, --batch-size, --out-dir, --gradcam-samples)
+override the YAML defaults when explicitly passed.
 """
 
 import argparse
 import csv
+import json
 import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_EXPERIMENTS_DIR = Path(__file__).resolve().parent
+if str(_EXPERIMENTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_EXPERIMENTS_DIR))
+
+try:
+    from experiments.exp_config import (
+        load_config,
+        project_root,
+        resolve_overrides,
+        select_experiments,
+    )
+    from experiments.hypotheses import evaluate_hypotheses
+except ImportError:  # dijalankan langsung: python experiments/run_matrix.py
+    from exp_config import (
+        load_config,
+        project_root,
+        resolve_overrides,
+        select_experiments,
+    )
+    from hypotheses import evaluate_hypotheses
+
+PROJECT_ROOT = project_root()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-EXPERIMENTS = [
-    {
-        "id": "E1",
-        "denoise": False,
-        "enhance": "none",
-        "segment": "none",
-        "input_mode": "full",
-        "attention": "self_attention",
-        "desc": "Baseline tanpa denoise",
-    },
-    {
-        "id": "E2",
-        "denoise": True,
-        "enhance": "none",
-        "segment": "none",
-        "input_mode": "full",
-        "attention": "self_attention",
-        "desc": "BayesShrink wavelet denoising",
-    },
-    {
-        "id": "E3",
-        "denoise": True,
-        "enhance": "clahe",
-        "segment": "none",
-        "input_mode": "full",
-        "attention": "self_attention",
-        "desc": "Denoise + CLAHE enhancement",
-    },
-    {
-        "id": "E4",
-        "denoise": True,
-        "enhance": "clahe",
-        "segment": "otsu",
-        "input_mode": "roi",
-        "attention": "self_attention",
-        "desc": "Preprocessing terbaik + ROI crop Otsu",
-    },
-    {
-        "id": "E5",
-        "denoise": True,
-        "enhance": "clahe",
-        "segment": "otsu",
-        "input_mode": "masked",
-        "attention": "self_attention",
-        "desc": "Preprocessing terbaik + masked input Otsu",
-    },
-    {
-        "id": "E6",
-        "denoise": True,
-        "enhance": "clahe",
-        "segment": "otsu",
-        "input_mode": "roi",
-        "attention": "cbam",
-        "desc": "Konfigurasi terbaik + CBAM attention",
-    },
+MAIN_FLAGS = [
+    ("--data-dir", "data_dir"),
+    ("--epochs", "epochs"),
+    ("--batch-size", "batch_size"),
+    ("--image-size", "image_size"),
+    ("--lr", "lr"),
+    ("--weight-decay", "weight_decay"),
+    ("--patience", "patience"),
+    ("--dropout", "dropout"),
+    ("--seg-pad", "seg_pad"),
+    ("--num-workers", "num_workers"),
+    ("--attention", "attention"),
+    ("--enhance", "enhance"),
+    ("--segment", "segment"),
+    ("--input-mode", "input_mode"),
+    ("--gradcam-samples", "gradcam_samples"),
 ]
 
 METRIC_RE = {
@@ -117,34 +101,23 @@ def model_stats(attention, repeats=20):
     return total_params, round(elapsed_ms, 2)
 
 
-def run_experiment(experiment, args, out_root):
-    save_dir = out_root / experiment["id"]
-    save_dir.mkdir(parents=True, exist_ok=True)
-    cmd = [
-        sys.executable,
-        str(PROJECT_ROOT / "main.py"),
-        "--data-dir",
-        args.data_dir,
-        "--epochs",
-        str(args.epochs),
-        "--batch-size",
-        str(args.batch_size),
-        "--save-dir",
-        str(save_dir),
-        "--attention",
-        experiment["attention"],
-        "--enhance",
-        experiment["enhance"],
-        "--segment",
-        experiment["segment"],
-        "--input-mode",
-        experiment["input_mode"],
-        "--gradcam",
-        "--gradcam-samples",
-        str(args.gradcam_samples),
-    ]
+def build_command(experiment, save_dir):
+    cmd = [sys.executable, str(PROJECT_ROOT / "main.py")]
+    for flag, key in MAIN_FLAGS:
+        value = experiment.get(key)
+        if value is None:
+            continue
+        cmd.extend([flag, str(value)])
+    cmd.extend(["--save-dir", str(save_dir), "--gradcam"])
     if experiment["denoise"]:
         cmd.append("--denoise")
+    return cmd
+
+
+def run_experiment(experiment, out_root):
+    save_dir = out_root / experiment["id"]
+    save_dir.mkdir(parents=True, exist_ok=True)
+    cmd = build_command(experiment, save_dir)
     log_path = save_dir / "stdout.log"
     proc = subprocess.run(
         cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False
@@ -169,32 +142,59 @@ def run_experiment(experiment, args, out_root):
     return result
 
 
+def save_matrix_summary(out_root, rows):
+    summaries = {}
+    for row in rows:
+        summary_path = out_root / row["id"] / "run_summary.json"
+        if summary_path.exists():
+            summaries[row["id"]] = json.loads(summary_path.read_text())
+    matrix = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "experiments": rows,
+        "hypotheses": evaluate_hypotheses(rows),
+        "run_summaries": summaries,
+    }
+    output_path = out_root / "matrix_summary.json"
+    output_path.write_text(json.dumps(matrix, indent=2))
+    print(f"Saved {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run PCD+ACM experiment matrix")
-    parser.add_argument("--data-dir", default="datasets")
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--gradcam-samples", type=int, default=5)
-    parser.add_argument("--out-dir", default="experiments/results")
+    parser.add_argument("--config", default="experiments/experiments.yml")
+    parser.add_argument("--data-dir", default=None)
+    parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument("--gradcam-samples", type=int, default=None)
+    parser.add_argument("--out-dir", default=None)
     parser.add_argument("--only", default="", help="Comma-separated subset, e.g. E1,E2")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the main.py commands without running them",
+    )
     args = parser.parse_args()
 
-    only = {s.strip() for s in args.only.split(",") if s.strip()}
-    selected = [
-        experiment
-        for experiment in EXPERIMENTS
-        if not only or experiment["id"] in only
-    ]
-    out_root = PROJECT_ROOT / args.out_dir
+    config_path = PROJECT_ROOT / args.config
+    _, experiments = load_config(config_path)
+    experiments = resolve_overrides(args, experiments)
+    selected = select_experiments(experiments, args.only)
+    out_root = PROJECT_ROOT / selected[0]["out_dir"]
     out_root.mkdir(parents=True, exist_ok=True)
 
-    rows = [run_experiment(experiment, args, out_root) for experiment in selected]
+    if args.dry_run:
+        for experiment in selected:
+            print(f"[{experiment['id']}] {experiment['desc']}")
+        return
+
+    rows = [run_experiment(experiment, out_root) for experiment in selected]
     csv_path = out_root / "results.csv"
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
     print(f"\nSaved {csv_path}")
+    save_matrix_summary(out_root, rows)
 
 
 if __name__ == "__main__":

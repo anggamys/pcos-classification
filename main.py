@@ -1,9 +1,8 @@
-import argparse
+import torch
 from collections.abc import Sized
 from typing import cast
 
-import torch
-
+from src.cli import build_config, parse_args
 from src.dataset import create_dataloaders
 from src.evaluate import (
     compute_metrics,
@@ -14,105 +13,8 @@ from src.evaluate import (
     print_report,
 )
 from src.models.densenet121 import DenseNet121Attention
+from src.run_summary import save_run_summary
 from src.train import train
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Pengaruh Wavelet Denoising dan Segmentasi Folikel "
-        "terhadap Klasifikasi PCOS dengan DenseNet-121 + Attention"
-    )
-
-    parser.add_argument(
-        "--data-dir",
-        type=str,
-        default="datasets",
-        help="Path to dataset directory (default: datasets)",
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=64, help="Batch size (default: 64)"
-    )
-    parser.add_argument(
-        "--image-size", type=int, default=224, help="Image resize size (default: 224)"
-    )
-    parser.add_argument(
-        "--epochs", type=int, default=30, help="Max training epochs (default: 30)"
-    )
-    parser.add_argument(
-        "--lr", type=float, default=1e-4, help="Learning rate (default: 1e-4)"
-    )
-    parser.add_argument(
-        "--weight-decay", type=float, default=1e-4, help="Weight decay (default: 1e-4)"
-    )
-    parser.add_argument(
-        "--patience", type=int, default=10, help="Early stopping patience (default: 10)"
-    )
-    parser.add_argument(
-        "--save-dir",
-        type=str,
-        default="checkpoints",
-        help="Directory to save checkpoints (default: checkpoints)",
-    )
-    parser.add_argument(
-        "--denoise", action="store_true", help="Enable wavelet denoising preprocessing"
-    )
-    parser.add_argument(
-        "--enhance",
-        type=str,
-        default="none",
-        choices=["none", "clahe"],
-        help="Contrast enhancement (default: none)",
-    )
-    parser.add_argument(
-        "--segment",
-        type=str,
-        default="none",
-        choices=["none", "otsu", "adaptive"],
-        help="Follicle segmentation method (default: none)",
-    )
-    parser.add_argument(
-        "--input-mode",
-        type=str,
-        default="full",
-        choices=["full", "roi", "masked"],
-        help="Model input: full image, ROI crop, or masked (default: full)",
-    )
-    parser.add_argument(
-        "--seg-pad",
-        type=int,
-        default=8,
-        help="Padding around ROI crop in pixels (default: 8)",
-    )
-    parser.add_argument(
-        "--no-pretrained",
-        action="store_true",
-        help="Disable ImageNet pretrained weights",
-    )
-    parser.add_argument(
-        "--num-workers", type=int, default=2, help="DataLoader num_workers (default: 2)"
-    )
-
-    parser.add_argument(
-        "--attention",
-        type=str,
-        default="self_attention",
-        choices=["self_attention", "se_net", "cbam", "transformer"],
-        help="Attention mechanism (default: self_attention)",
-    )
-    parser.add_argument(
-        "--dropout", type=float, default=0.3, help="Dropout rate (default: 0.3)"
-    )
-    parser.add_argument(
-        "--gradcam", action="store_true", help="Generate Grad-CAM visualization"
-    )
-    parser.add_argument(
-        "--gradcam-samples",
-        type=int,
-        default=5,
-        help="Number of Grad-CAM samples (default: 5)",
-    )
-
-    return parser.parse_args()
 
 
 def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
@@ -124,39 +26,31 @@ def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
     )
 
 
-def main():
-    args = parse_args()
-
-    config = {
-        "data_dir": args.data_dir,
-        "batch_size": args.batch_size,
-        "image_size": args.image_size,
-        "epochs": args.epochs,
-        "lr": args.lr,
-        "weight_decay": args.weight_decay,
-        "patience": args.patience,
-        "save_dir": args.save_dir,
-        "denoise": args.denoise,
-        "enhance": args.enhance,
-        "segment": args.segment,
-        "input_mode": args.input_mode,
-        "seg_pad": args.seg_pad,
-    }
-
+def print_config(config, args):
     print("Config:")
-    for k, v in config.items():
-        print(f"  {k}: {v}")
+    for key, value in config.items():
+        print(f"  {key}: {value}")
     print("  model: densenet121")
     print(f"  attention: {args.attention}")
     print(f"  dropout: {args.dropout}")
     print()
 
+
+def print_gpu_info():
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         total_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
         print(f"GPU: {gpu_name}")
         print(f"VRAM: {total_mem:.1f} GB | AMP: enabled (float16)")
         print()
+
+
+def main():
+    args = parse_args()
+    config = build_config(args)
+
+    print_config(config, args)
+    print_gpu_info()
 
     print("Loading dataset...")
     train_loader, val_loader, test_loader = create_dataloaders(
@@ -174,6 +68,11 @@ def main():
     print(f"Train: {len(cast(Sized, train_loader.dataset))}")
     print(f"Val:   {len(cast(Sized, val_loader.dataset))}")
     print(f"Test:  {len(cast(Sized, test_loader.dataset))}")
+    dataset_sizes = {
+        "train": len(cast(Sized, train_loader.dataset)),
+        "val": len(cast(Sized, val_loader.dataset)),
+        "test": len(cast(Sized, test_loader.dataset)),
+    }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -187,7 +86,7 @@ def main():
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total params:     {total_params:,}")
     print(f"Trainable params: {trainable_params:,}")
-
+    model_info = {"total_params": total_params, "trainable_params": trainable_params}
     print("\nStarting training...")
     history = train(model, train_loader, val_loader, config)
 
@@ -234,6 +133,17 @@ def main():
             num_samples=args.gradcam_samples,
             save_dir=args.save_dir,
         )
+
+    save_run_summary(
+        args.save_dir,
+        args,
+        config,
+        dataset_sizes,
+        model_info,
+        history,
+        metrics,
+        device,
+    )
 
 
 if __name__ == "__main__":

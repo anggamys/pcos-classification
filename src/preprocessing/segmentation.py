@@ -30,9 +30,7 @@ def otsu_threshold(gray, nbins=256):
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
     background_weight = np.cumsum(hist) / pixel_total
     foreground_weight = 1.0 - background_weight
-    background_mean = np.cumsum(hist * bin_centers) / np.maximum(
-        np.cumsum(hist), 1e-10
-    )
+    background_mean = np.cumsum(hist * bin_centers) / np.maximum(np.cumsum(hist), 1e-10)
     global_mean = (hist * bin_centers).sum() / pixel_total
     foreground_mean = (global_mean - background_weight * background_mean) / np.maximum(
         foreground_weight, 1e-10
@@ -57,7 +55,9 @@ def _disk(radius):
     row_coords, col_coords = np.ogrid[
         -disk_radius : disk_radius + 1, -disk_radius : disk_radius + 1
     ]
-    return (col_coords * col_coords + row_coords * row_coords) <= disk_radius * disk_radius
+    return (
+        col_coords * col_coords + row_coords * row_coords
+    ) <= disk_radius * disk_radius
 
 
 def _label_mask(mask):

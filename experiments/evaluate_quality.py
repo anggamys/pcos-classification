@@ -8,7 +8,8 @@ For a deterministic sample of N images per class:
 
 Outputs (default experiments/quality/):
 - quality.csv      : one row per image
-- summary.txt      : mean/std per metric, per class
+- summary.txt      : mean/std per metric, per class (human readable)
+- summary.json     : same summary, machine readable
 - figures/         : sample overlays (raw | denoised | enhanced | mask overlay)
 
 Usage:
@@ -17,6 +18,7 @@ Usage:
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
 import matplotlib
@@ -32,9 +34,9 @@ import sys
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.image_quality import enhance, psnr, ssim, summarize
-from src.preprocessing import wavelet_denoise
-from src.segmentation import analyze_regions, overlay_mask, segment
+from src.preprocessing.quality import enhance, psnr, ssim, summarize
+from src.preprocessing.segmentation import analyze_regions, overlay_mask, segment
+from src.preprocessing.wavelet import wavelet_denoise
 
 CLASSES = ["infected", "noninfected"]
 SEG_METHODS = ["otsu", "adaptive"]
@@ -121,11 +123,13 @@ def main():
         writer.writeheader()
         writer.writerows(rows)
 
-    # Summary per class + overall
+    # Summary per class + overall (txt for humans, json for documentation)
     lines = []
+    structured = {"samples_per_class": args.samples_per_class, "classes": {}}
     for cls in CLASSES + ["all"]:
         subset = [r for r in rows if cls == "all" or r["class"] == cls]
         lines.append(f"== {cls} (n={len(subset)}) ==")
+        structured["classes"][cls] = {"n": len(subset), "metrics": {}}
         for key in rows[0]:
             if key in ("file", "class"):
                 continue
@@ -134,8 +138,10 @@ def main():
                 f"  {key}: mean={s['mean']:.4f} std={s['std']:.4f} "
                 f"min={s['min']:.4f} max={s['max']:.4f}"
             )
+            structured["classes"][cls]["metrics"][key] = s
     summary = "\n".join(lines)
     (out_root / "summary.txt").write_text(summary)
+    (out_root / "summary.json").write_text(json.dumps(structured, indent=2))
     print("\n" + summary)
     print(f"\nSaved {csv_path}")
 

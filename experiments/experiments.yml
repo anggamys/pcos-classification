@@ -1,0 +1,81 @@
+# Matriks eksperimen tugas akhir PCD + Analisis Citra Medis (E1-E6).
+#
+# Dijalankan dengan:
+#   python experiments/run_matrix.py --config experiments/experiments.yml
+#   python experiments/run_matrix.py --config experiments/experiments.yml --only E1,E2
+#
+# Nilai tiap eksperimen menimpa blok defaults di bawah. Field hypothesis dan
+# tests hanya dokumentasi ketertelusuran H1-H3 (diabaikan runner).
+
+defaults:
+  data_dir: datasets
+  epochs: 30
+  batch_size: 64
+  image_size: 224
+  lr: 0.0001
+  weight_decay: 0.0001
+  patience: 10
+  dropout: 0.3
+  seg_pad: 8
+  num_workers: 2
+  gradcam_samples: 5
+  out_dir: experiments/results
+
+experiments:
+  - id: E1
+    desc: Baseline tanpa denoise
+    hypothesis: baseline H1
+    denoise: false
+    enhance: none
+    segment: none
+    input_mode: full
+    attention: self_attention
+
+  - id: E2
+    desc: BayesShrink wavelet denoising
+    hypothesis: H1
+    tests: PSNR/SSIM E2 > E1 dan akurasi/AUC E2 >= E1
+    denoise: true
+    enhance: none
+    segment: none
+    input_mode: full
+    attention: self_attention
+
+  - id: E3
+    desc: Denoise + CLAHE enhancement
+    hypothesis: baseline H2
+    denoise: true
+    enhance: clahe
+    segment: none
+    input_mode: full
+    attention: self_attention
+
+  - id: E4
+    desc: Preprocessing terbaik + ROI crop Otsu
+    hypothesis: H2, baseline H3
+    tests: F1/AUC E4 > E3
+    denoise: true
+    enhance: clahe
+    segment: otsu
+    input_mode: roi
+    attention: self_attention
+
+  - id: E5
+    desc: Preprocessing terbaik + masked input Otsu
+    hypothesis: H2
+    tests: F1/AUC E5 > E3
+    denoise: true
+    enhance: clahe
+    segment: otsu
+    input_mode: masked
+    attention: self_attention
+
+  - id: E6
+    desc: Konfigurasi terbaik + CBAM attention
+    hypothesis: H3
+    tests: akurasi/AUC E6 >= E4 - 0.5 poin, parameter lebih sedikit, latency tidak lebih besar
+    denoise: true
+    enhance: clahe
+    segment: otsu
+    input_mode: roi
+    attention: cbam

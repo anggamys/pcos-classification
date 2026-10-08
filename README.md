@@ -31,9 +31,10 @@ pcos-classification/
 │   └── noninfected/           # 5.000 citra sehat
 ├── src/
 │   ├── dataset.py             # Custom Dataset & DataLoader (full/roi/masked)
-│   ├── preprocessing.py       # Wavelet denoising (BayesShrink)
-│   ├── segmentation.py        # Segmentasi folikel unsupervised (Otsu/adaptive + morfologi)
-│   ├── image_quality.py       # Enhancement CLAHE, metrik PSNR/SSIM
+│   ├── preprocessing/         # Tahap PCD: enhancement, denoise, segmentasi, metrik
+│   │   ├── wavelet.py         # Wavelet denoising (BayesShrink)
+│   │   ├── segmentation.py    # Segmentasi folikel unsupervised (Otsu/adaptive + morfologi)
+│   │   └── quality.py         # Enhancement CLAHE, metrik PSNR/SSIM
 │   ├── train.py               # Training pipeline
 │   ├── evaluate.py            # Metrics & visualisasi
 │   ├── gradcam.py             # Grad-CAM visualisasi (custom)
@@ -142,11 +143,12 @@ python main.py --denoise --enhance clahe --segment otsu --input-mode roi --atten
 ### 2. Matriks Eksperimen (Tugas Akhir PCD + Citra Medis)
 
 ```bash
-# Jalankan 6 eksperimen E1-E6 (hasil ke experiments/results/results.csv)
-python experiments/run_matrix.py --data-dir datasets --epochs 30
+# Jalankan 6 eksperimen E1-E6 sesuai experiments/experiments.yml
+# (hasil ke experiments/results/results.csv)
+python experiments/run_matrix.py --config experiments/experiments.yml
 
-# Sebagian saja
-python experiments/run_matrix.py --data-dir datasets --epochs 30 --only E1,E2
+# Sebagian saja, atau timpa data-dir/epochs dari YAML
+python experiments/run_matrix.py --config experiments/experiments.yml --only E1,E2
 ```
 
 | ID | Preprocessing | Segmentasi/ROI | Attention |
@@ -176,14 +178,20 @@ python experiments/run_matrix.py --data-dir datasets --epochs 30 --only E1,E2
 # 0. Bukti sisi PCD untuk H1 (tanpa training, cepat, bisa jalan di CPU)
 python experiments/evaluate_quality.py --data-dir /content/drive/MyDrive/data-latih/PCOS --samples-per-class 100
 
-# Full matrix E1-E6
-python experiments/run_matrix.py --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30
+# Full matrix E1-E6 (data-dir Colab menimpa nilai YAML)
+python experiments/run_matrix.py --config experiments/experiments.yml --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30
 
 # Sebagian dulu (disarankan untuk sesi Colab pendek)
-python experiments/run_matrix.py --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30 --only E1,E2
+python experiments/run_matrix.py --config experiments/experiments.yml --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30 --only E1,E2
 ```
 
 Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, dan ringkasan metrik ke `experiments/results/results.csv`. Estimasi ±50-60 menit per run 30 epoch di T4.
+
+### Dokumentasi JSON (proses & hasil machine-readable)
+
+- Tiap run menulis `run_summary.json` di folder `--save-dir`-nya: timestamp, git commit, environment (device/GPU/versi torch), config lengkap, ukuran dataset, parameter model, history per-epoch, epoch terbaik, flag early stopping, metrik test, dan daftar artefak.
+- `run_matrix.py` menulis `matrix_summary.json` di `out_dir`: seluruh baris eksperimen + verdict deskriptif H1–H3 (`accepted`/`not_accepted`, hanya untuk eksperimen yang datanya tersedia) + salinan tiap `run_summary.json`.
+- `evaluate_quality.py` menulis `summary.json` di samping `summary.txt` (mean/std/min/max per metrik, per kelas).
 
 ## Hasil
 

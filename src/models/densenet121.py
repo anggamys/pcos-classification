@@ -1,19 +1,32 @@
 import torch
-import torch.nn as nn
-from torchvision.models import densenet121, DenseNet121_Weights
+from torch import nn
+from torchvision.models import DenseNet121_Weights, densenet121
 
-from .attention import SelfAttention, SEAttention, CBAMAttention, TransformerAttention
+from .attention import CBAMAttention, SEAttention, SelfAttention, TransformerAttention
 
 
 class DenseNet121Attention(nn.Module):
-    def __init__(self, num_classes=1, pretrained=True, dropout=0.3,
-                 attention_type="self_attention"):
+    """DenseNet-121 pretrained + modul attention + classifier biner PCOS.
+
+    Args:
+        num_classes (int): Jumlah kelas keluaran (default 1, logit biner).
+        pretrained (bool): Muat bobot ImageNet bila True.
+        dropout (float): Laju dropout classifier.
+        attention_type (str): "self_attention", "se_net", "cbam",
+            atau "transformer".
+    """
+
+    def __init__(
+        self,
+        pretrained=True,
+        dropout=0.3,
+        attention_type="self_attention",
+    ):
         super().__init__()
         weights = DenseNet121_Weights.IMAGENET1K_V1 if pretrained else None
         self.backbone = densenet121(weights=weights)
 
         feature_dim = self.backbone.classifier.in_features
-        self.backbone.classifier = nn.Identity()
 
         self.attention_type = attention_type
 
@@ -44,6 +57,14 @@ class DenseNet121Attention(nn.Module):
         )
 
     def forward(self, x):
+        """Forward: ekstraksi fitur, attention, lalu logit biner.
+
+        Args:
+            x (torch.Tensor): Batch citra (B, 3, H, W).
+
+        Returns:
+            torch.Tensor: Logit biner bentuk (B, 1).
+        """
         features = self.backbone.features(x)
 
         if self.use_2d:

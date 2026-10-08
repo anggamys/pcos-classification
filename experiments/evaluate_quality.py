@@ -43,6 +43,16 @@ SEG_METHODS = ["otsu", "adaptive"]
 
 
 def sample_images(data_dir, samples_per_class, seed=42):
+    """Ambil sampel citra acak deterministik per kelas.
+
+    Args:
+        data_dir (str): Direktori dataset (berisi infected/noninfected).
+        samples_per_class (int): Jumlah sampel per kelas.
+        seed (int): Seed acak agar sampel reprodusibel.
+
+    Returns:
+        dict: Daftar path citra per kelas ("infected", "noninfected").
+    """
     rng = np.random.RandomState(seed)
     picked = {}
     for cls in CLASSES:
@@ -56,6 +66,15 @@ def sample_images(data_dir, samples_per_class, seed=42):
 
 
 def process_one(img_path):
+    """Proses satu citra: denoise, enhance, metrik, dan statistik ROI.
+
+    Args:
+        img_path (Path): Path file citra.
+
+    Returns:
+        tuple: (baris metrik quality.csv, citra asli, hasil denoise,
+            hasil enhance) untuk figure.
+    """
     raw = Image.open(img_path).convert("RGB")
     denoised = wavelet_denoise(raw)
     enhanced = enhance(denoised, "clahe")
@@ -75,6 +94,15 @@ def process_one(img_path):
 
 
 def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
+    """Simpan figure 4 panel (asli, denoise, enhance, overlay Otsu).
+
+    Args:
+        raw (PIL.Image.Image): Citra asli.
+        denoised (PIL.Image.Image): Citra hasil denoise.
+        enhanced (PIL.Image.Image): Citra hasil denoise+CLAHE.
+        save_path (Path): Path PNG tujuan.
+        n_overlays (int): Parameter cadangan jumlah overlay (saat ini 1).
+    """
     mask = segment(enhanced, method="otsu")
     overlay = overlay_mask(enhanced, mask)
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
@@ -92,6 +120,7 @@ def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
 
 
 def main():
+    """Orkestrasi evaluasi kualitas: sampling, proses, tulis CSV/JSON/figure."""
     parser = argparse.ArgumentParser(description="H1 quality evaluation (no training)")
     parser.add_argument("--data-dir", default="datasets")
     parser.add_argument("--samples-per-class", type=int, default=100)

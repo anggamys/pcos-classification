@@ -72,6 +72,14 @@ METRIC_RE = {
 
 
 def parse_metrics(stdout):
+    """Urai metrik (Accuracy/AUC/...) dari stdout main.py via regex.
+
+    Args:
+        stdout (str): Keluaran terminal satu run main.py.
+
+    Returns:
+        dict: Nilai float per metrik; None bila pola tak ditemukan.
+    """
     metrics = {}
     for key, pattern in METRIC_RE.items():
         match = pattern.search(stdout)
@@ -80,6 +88,15 @@ def parse_metrics(stdout):
 
 
 def model_stats(attention, repeats=20):
+    """Hitung parameter dan latency inferensi CPU (bukti efisiensi H3).
+
+    Args:
+        attention (str): Jenis mekanisme attention model.
+        repeats (int): Pengulangan pengukuran latency (default 20).
+
+    Returns:
+        tuple: (total parameter, latency ms per forward di CPU).
+    """
     """Total params + CPU inference latency (efficiency evidence for H3)."""
     import torch
 
@@ -102,6 +119,15 @@ def model_stats(attention, repeats=20):
 
 
 def build_command(experiment, save_dir):
+    """Susun perintah subprocess main.py dari dict eksperimen.
+
+    Args:
+        experiment (dict): Config eksperimen hasil merge YAML.
+        save_dir (Path): Direktori keluaran eksperimen ini.
+
+    Returns:
+        list: Perintah siap `subprocess.run` (melewati nilai None).
+    """
     cmd = [sys.executable, str(PROJECT_ROOT / "main.py")]
     for flag, key in MAIN_FLAGS:
         value = experiment.get(key)
@@ -115,6 +141,16 @@ def build_command(experiment, save_dir):
 
 
 def run_experiment(experiment, out_root):
+    """Jalankan satu eksperimen sebagai subprocess + kumpulkan hasilnya.
+
+    Args:
+        experiment (dict): Config eksperimen hasil merge YAML.
+        out_root (Path): Direktori akar hasil matriks.
+
+    Returns:
+        dict: Baris hasil (id, config, metrik, parameter, latency,
+            returncode) untuk results.csv.
+    """
     save_dir = out_root / experiment["id"]
     save_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_command(experiment, save_dir)
@@ -143,6 +179,12 @@ def run_experiment(experiment, out_root):
 
 
 def save_matrix_summary(out_root, rows):
+    """Tulis matrix_summary.json: baris eksperimen + verdict + run summary.
+
+    Args:
+        out_root (Path): Direktori akar hasil matriks.
+        rows (list): Baris hasil tiap eksperimen.
+    """
     summaries = {}
     for row in rows:
         summary_path = out_root / row["id"] / "run_summary.json"
@@ -160,6 +202,7 @@ def save_matrix_summary(out_root, rows):
 
 
 def main():
+    """Orkestrasi matriks: muat YAML, jalankan eksperimen, tulis CSV+JSON."""
     parser = argparse.ArgumentParser(description="Run PCD+ACM experiment matrix")
     parser.add_argument("--config", default="experiments/experiments.yml")
     parser.add_argument("--data-dir", default=None)

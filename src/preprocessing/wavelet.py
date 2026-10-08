@@ -5,6 +5,19 @@ from scipy.ndimage import gaussian_filter
 
 
 def bayes_shrink_denoise(channel, wavelet="db4", level=3):
+    """Denoising kanal tunggal dengan threshold adaptif BayesShrink.
+
+    Noise diestimasi dari median koefisien detail terhalus, lalu tiap
+    koefisien detail di-soft-threshold secara adaptif sebelum rekonstruksi.
+
+    Args:
+        channel (numpy.ndarray): Array 2D satu kanal citra, rentang [0, 1].
+        wavelet (str): Nama wavelet diskret (default "db4").
+        level (int): Level dekomposisi wavelet (default 3).
+
+    Returns:
+        numpy.ndarray: Array 2D hasil denoise, bentuk sama dengan masukan.
+    """
     coeffs = pywt.wavedec2(channel, wavelet, level=level)
     sigma = np.median(np.abs(coeffs[-1][0])) / 0.6745
 
@@ -23,6 +36,14 @@ def bayes_shrink_denoise(channel, wavelet="db4", level=3):
 
 
 def wavelet_denoise(pil_image):
+    """Denoising citra dengan BayesShrink per kanal warna.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan (grayscale atau RGB).
+
+    Returns:
+        PIL.Image.Image: Citra hasil denoise, ukuran sama dengan masukan.
+    """
     img = np.array(pil_image).astype(np.float64) / 255.0
 
     if img.ndim == 3 and img.shape[2] == 3:
@@ -41,6 +62,15 @@ def wavelet_denoise(pil_image):
 
 
 def gaussian_smooth(pil_image, sigma=0.5):
+    """Penghalusan Gaussian ringan untuk sisa noise setelah denoising.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        sigma (float): Standar deviasi kernel Gaussian (default 0.5).
+
+    Returns:
+        PIL.Image.Image: Citra hasil penghalusan, ukuran sama dengan masukan.
+    """
     img = np.array(pil_image).astype(np.float64)
     smoothed = gaussian_filter(img, sigma=sigma, axes=(0, 1))
     return Image.fromarray(smoothed.astype(np.uint8))

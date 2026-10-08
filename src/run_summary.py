@@ -27,6 +27,11 @@ SUMMARY_ARTIFACTS = [
 
 
 def get_git_commit():
+    """Ambil hash commit git pendek untuk keterlacakan run.
+
+    Returns:
+        str: Hash commit pendek, atau "unknown" bila git tak tersedia.
+    """
     try:
         return (
             subprocess.run(
@@ -44,7 +49,22 @@ def get_git_commit():
 def save_run_summary(
     save_dir, args, config, dataset_sizes, model_info, history, test_metrics, device
 ):
-    """Write machine-readable run documentation to run_summary.json."""
+    """Tulis dokumentasi run machine-readable ke run_summary.json.
+
+    Mencatat timestamp, commit git, environment, config, ukuran dataset,
+    info model, history per-epoch, epoch terbaik, status early stopping,
+    metrik test, dan daftar artefak yang benar-benar tersimpan.
+
+    Args:
+        save_dir (str atau Path): Direktori keluaran run.
+        args (argparse.Namespace): Argumen CLI (attention, dropout, ...).
+        config (dict): Config training dari `build_config`.
+        dataset_sizes (dict): Cacah train/val/test.
+        model_info (dict): total_params dan trainable_params.
+        history (dict): History train/val loss dan akurasi per epoch.
+        test_metrics (dict): Metrik hasil `compute_metrics`.
+        device (torch.device): Perangkat komputasi yang dipakai.
+    """
     checkpoint = torch.load(
         Path(save_dir) / "best_model.pth", map_location="cpu", weights_only=True
     )

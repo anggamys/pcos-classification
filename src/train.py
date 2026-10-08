@@ -10,6 +10,20 @@ from tqdm import tqdm
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device, scaler, use_amp):
+    """Satu epoch pelatihan dengan mixed precision.
+
+    Args:
+        model (torch.nn.Module): Model yang dilatih.
+        loader (DataLoader): DataLoader training.
+        criterion: Fungsi loss (BCEWithLogitsLoss).
+        optimizer: Optimizer PyTorch.
+        device (torch.device): CPU atau CUDA.
+        scaler (torch.amp.GradScaler): Scaler mixed precision.
+        use_amp (bool): Aktifkan autocast float16.
+
+    Returns:
+        tuple: (rata-rata loss, akurasi) epoch ini.
+    """
     model.train()
     total_loss = 0
     correct = 0
@@ -39,6 +53,18 @@ def train_one_epoch(model, loader, criterion, optimizer, device, scaler, use_amp
 
 @torch.no_grad()
 def validate(model, loader, criterion, device, use_amp):
+    """Evaluasi model pada data validasi tanpa gradient.
+
+    Args:
+        model (torch.nn.Module): Model yang dievaluasi.
+        loader (DataLoader): DataLoader validasi.
+        criterion: Fungsi loss.
+        device (torch.device): CPU atau CUDA.
+        use_amp (bool): Aktifkan autocast float16.
+
+    Returns:
+        tuple: (rata-rata loss, akurasi) validasi.
+    """
     model.eval()
     total_loss = 0
     correct = 0
@@ -61,6 +87,21 @@ def validate(model, loader, criterion, device, use_amp):
 
 
 def train(model, train_loader, val_loader, config):
+    """Loop pelatihan: Adam + ReduceLROnPlateau + early stopping.
+
+    Model terbaik (val loss terkecil) disimpan ke `best_model.pth` di
+    direktori save_dir pada config.
+
+    Args:
+        model (torch.nn.Module): Model yang dilatih.
+        train_loader (DataLoader): DataLoader training.
+        val_loader (DataLoader): DataLoader validasi.
+        config (dict): Berisi epochs, lr, weight_decay, patience,
+            batch_size, dan save_dir.
+
+    Returns:
+        dict: History train_loss, train_acc, val_loss, val_acc per epoch.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if device.type == "cuda":

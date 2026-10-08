@@ -4,6 +4,16 @@ H3_TOLERANCE = 0.005
 
 
 def _take(by_id, row_id, keys):
+    """Ambil sekelompok metrik; None bila ada yang hilang.
+
+    Args:
+        by_id (dict): Metrik per id eksperimen.
+        row_id (str): Id eksperimen (mis. "E4").
+        keys (tuple): Kunci metrik yang diambil.
+
+    Returns:
+        dict atau None: Dict {key: float} bila lengkap, else None.
+    """
     """Return {key: value} or None when any metric is missing."""
     values = {}
     for key in keys:
@@ -15,12 +25,33 @@ def _take(by_id, row_id, keys):
 
 
 def _optional(by_id, row_id, key):
+    """Ambil satu metrik opsional sebagai float.
+
+    Args:
+        by_id (dict): Metrik per id eksperimen.
+        row_id (str): Id eksperimen.
+        key (str): Kunci metrik.
+
+    Returns:
+        float atau None: Nilai metrik, atau None bila hilang.
+    """
     """Return a single metric value or None when missing."""
     value = by_id.get(row_id, {}).get(key)
     return None if value is None else float(value)
 
 
 def evaluate_hypotheses(rows):
+    """Verdict deskriptif H1-H3 dari metrik eksperimen (tanpa statistik).
+
+    Hipotesis yang datanya belum lengkap dilewati agar run parsial
+    (--only) tetap menghasilkan verdict untuk yang tersedia.
+
+    Args:
+        rows (list): Baris hasil tiap eksperimen (id + metrik).
+
+    Returns:
+        dict: Status accepted/not_accepted beserta detail per hipotesis.
+    """
     by_id = {row["id"]: row for row in rows}
     verdicts = {}
 

@@ -6,6 +6,13 @@ from PIL import Image
 
 
 class GradCAM:
+    """Heatmap Grad-CAM kustom untuk interpretasi keputusan model.
+
+    Args:
+        model (torch.nn.Module): Model yang divisualisasi.
+        target_layer (torch.nn.Module): Lapisan konvolusi target heatmap.
+    """
+
     def __init__(self, model, target_layer):
         self.model = model
         self.target_layer = target_layer
@@ -16,12 +23,23 @@ class GradCAM:
         target_layer.register_full_backward_hook(self._backward_hook)
 
     def _forward_hook(self, module, input, output):
+        """Simpan aktivasi lapisan target saat forward pass."""
         self.activations = output.detach()
 
     def _backward_hook(self, module, grad_input, grad_output):
+        """Simpan gradien lapisan target saat backward pass."""
         self.gradients = grad_output[0].detach()
 
     def generate(self, input_tensor, target_class=None):
+        """Hasilkan heatmap Grad-CAM ternormalisasi [0, 1].
+
+        Args:
+            input_tensor (torch.Tensor): Batch satu citra (1, C, H, W).
+            target_class (int atau None): Kelas target; kelas prediksi bila None.
+
+        Returns:
+            numpy.ndarray: Heatmap 2D seukuran citra masukan.
+        """
         self.model.eval()
         output = self.model(input_tensor)
 
@@ -49,6 +67,14 @@ class GradCAM:
         return cam.squeeze().cpu().numpy()
 
     def visualize(self, input_tensor, image, target_class=None, save_path=None):
+        """Tampilkan panel asli, heatmap, dan overlay Grad-CAM.
+
+        Args:
+            input_tensor (torch.Tensor): Batch satu citra untuk model.
+            image (PIL.Image atau numpy.ndarray): Citra untuk panel asli.
+            target_class (int atau None): Kelas target heatmap.
+            save_path (str atau None): Path PNG tujuan; tampilkan bila None.
+        """
         cam = self.generate(input_tensor, target_class)
 
         if isinstance(image, Image.Image):
@@ -76,6 +102,14 @@ class GradCAM:
 
 
 def get_gradcam_target_layer(model):
+    """Cari lapisan konvolusi terakhir backbone untuk Grad-CAM.
+
+    Args:
+        model (torch.nn.Module): Model klasifikasi (DenseNet-121 + Attention).
+
+    Returns:
+        torch.nn.Module atau None: Lapisan target; None bila tak ditemukan.
+    """
     if hasattr(model, "backbone") and hasattr(model.backbone, "features"):
         features = model.backbone.features
         if hasattr(features, "denseblock4"):
@@ -86,6 +120,15 @@ def get_gradcam_target_layer(model):
 
 
 def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkpoints"):
+    """Hasilkan figure Grad-CAM beberapa sampel test ke direktori run.
+
+    Args:
+        model (torch.nn.Module): Model terlatih.
+        dataloader (DataLoader): DataLoader test.
+        device (torch.device): CPU atau CUDA.
+        num_samples (int): Jumlah sampel divisualisasi.
+        save_dir (str): Direktori keluaran figure.
+    """
     model.eval()
     target_layer = get_gradcam_target_layer(model)
 

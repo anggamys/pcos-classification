@@ -18,6 +18,16 @@ from src.train import train
 
 
 def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
+    """Bangun model DenseNet-121 + Attention sesuai judul kerja.
+
+    Args:
+        pretrained (bool): Muat bobot ImageNet.
+        dropout (float): Laju dropout classifier.
+        attention_type (str): Jenis mekanisme attention.
+
+    Returns:
+        DenseNet121Attention: Model klasifikasi biner PCOS.
+    """
     return DenseNet121Attention(
         num_classes=1,
         pretrained=pretrained,
@@ -27,6 +37,12 @@ def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
 
 
 def print_config(config, args):
+    """Cetak ringkasan config dan identitas model ke terminal.
+
+    Args:
+        config (dict): Config training.
+        args (argparse.Namespace): Argumen CLI (model, attention, dropout).
+    """
     print("Config:")
     for key, value in config.items():
         print(f"  {key}: {value}")
@@ -37,6 +53,7 @@ def print_config(config, args):
 
 
 def print_gpu_info():
+    """Cetak nama GPU dan VRAM bila CUDA tersedia; diam bila CPU."""
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         total_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
@@ -46,6 +63,7 @@ def print_gpu_info():
 
 
 def main():
+    """Orkestrasi satu run: data, model, training, evaluasi, dokumentasi."""
     args = parse_args()
     config = build_config(args)
 

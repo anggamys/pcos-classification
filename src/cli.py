@@ -4,6 +4,12 @@ import argparse
 
 
 def parse_args():
+    """Definisikan dan uraikan argumen baris perintah training.
+
+    Returns:
+        argparse.Namespace: Seluruh argumen CLI (data, preprocessing,
+            model, training, Grad-CAM).
+    """
     parser = argparse.ArgumentParser(
         description="Pengaruh Wavelet Denoising dan Segmentasi Folikel "
         "terhadap Klasifikasi PCOS dengan DenseNet-121 + Attention"
@@ -102,6 +108,15 @@ def parse_args():
 
 
 def build_config(args):
+    """Susun dict config training dari argumen CLI.
+
+    Args:
+        args (argparse.Namespace): Hasil `parse_args`.
+
+    Returns:
+        dict: Config (data_dir, batch_size, ..., seg_pad) untuk dataset
+            dan training.
+    """
     return {
         "data_dir": args.data_dir,
         "batch_size": args.batch_size,

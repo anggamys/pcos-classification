@@ -18,6 +18,16 @@ from torch.amp import autocast
 
 @torch.no_grad()
 def evaluate_model(model, loader, device):
+    """Inferensi seluruh loader dan kumpulkan probabilitas prediksi.
+
+    Args:
+        model (torch.nn.Module): Model terlatih (mode eval).
+        loader (DataLoader): DataLoader evaluasi (biasanya test).
+        device (torch.device): CPU atau CUDA.
+
+    Returns:
+        dict: labels, probabilities (sigmoid), dan predictions (ambang 0.5).
+    """
     model.eval()
     all_probabilities = []
     all_labels = []
@@ -43,6 +53,16 @@ def evaluate_model(model, loader, device):
 
 
 def compute_metrics(results):
+    """Hitung metrik diagnostik dari hasil evaluasi.
+
+    Args:
+        results (dict): Keluaran `evaluate_model`.
+
+    Returns:
+        dict: accuracy, precision, recall, f1, specificity, auc,
+            average_precision, plus kurva false/true positive rate dan
+            kurva precision-recall untuk plotting.
+    """
     labels = results["labels"]
     predictions = results["predictions"]
     probabilities = results["probabilities"]
@@ -75,6 +95,13 @@ def compute_metrics(results):
 
 
 def plot_confusion_matrix(labels, predictions, save_path=None):
+    """Gambar confusion matrix beranotasi cacah per sel.
+
+    Args:
+        labels (numpy.ndarray): Label sebenarnya (0/1).
+        predictions (numpy.ndarray): Label prediksi (0/1).
+        save_path (str atau None): Path PNG tujuan; tampilkan saja bila None.
+    """
     confusion_values = confusion_matrix(labels, predictions)
     _, ax = plt.subplots(figsize=(6, 5))
     im = ax.imshow(confusion_values, cmap="Blues")
@@ -110,6 +137,14 @@ def plot_confusion_matrix(labels, predictions, save_path=None):
 
 
 def plot_roc_curve(false_positive_rate, true_positive_rate, auc_value, save_path=None):
+    """Gambar kurva ROC beserta nilai AUC-nya.
+
+    Args:
+        false_positive_rate (numpy.ndarray): Sumbu-x kurva ROC.
+        true_positive_rate (numpy.ndarray): Sumbu-y kurva ROC.
+        auc_value (float): Nilai AUC untuk legenda.
+        save_path (str atau None): Path PNG tujuan; tampilkan saja bila None.
+    """
     _, ax = plt.subplots(figsize=(6, 5))
     ax.plot(
         false_positive_rate,
@@ -131,6 +166,14 @@ def plot_roc_curve(false_positive_rate, true_positive_rate, auc_value, save_path
 
 
 def plot_pr_curve(precision_curve, recall_curve, average_precision, save_path=None):
+    """Gambar kurva precision-recall beserta average precision-nya.
+
+    Args:
+        precision_curve (numpy.ndarray): Sumbu-y kurva PR.
+        recall_curve (numpy.ndarray): Sumbu-x kurva PR.
+        average_precision (float): Nilai AP untuk legenda.
+        save_path (str atau None): Path PNG tujuan; tampilkan saja bila None.
+    """
     _, ax = plt.subplots(figsize=(6, 5))
     ax.plot(
         recall_curve,
@@ -151,6 +194,12 @@ def plot_pr_curve(precision_curve, recall_curve, average_precision, save_path=No
 
 
 def plot_training_history(history, save_path=None):
+    """Gambar kurva loss dan akurasi train vs validasi per epoch.
+
+    Args:
+        history (dict): Keluaran `train` (train/val loss dan akurasi).
+        save_path (str atau None): Path PNG tujuan; tampilkan saja bila None.
+    """
     _, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
     ax1.plot(history["train_loss"], label="Train Loss")
@@ -176,6 +225,12 @@ def plot_training_history(history, save_path=None):
 
 
 def print_report(results):
+    """Cetak classification report sklearn ke terminal.
+
+    Args:
+        results (dict): Keluaran `evaluate_model` (memakai labels dan
+            predictions).
+    """
     print("\n" + "=" * 50)
     print("CLASSIFICATION REPORT")
     print("=" * 50)

@@ -8,7 +8,19 @@ from scipy.ndimage import gaussian_filter
 
 
 def enhance_clahe(pil_image, tiles=8, clip=2.0):
-    """Simplified tile-based contrast enhancement (CLAHE-like)."""
+    """Peningkatan kontras berbasis tile ala CLAHE.
+
+    Histogram tiap tile dibatasi (clip limit) agar noise homogen tidak ikut
+    dikuatkan, lalu diratakan via CDF.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        tiles (int): Jumlah tile per sisi (default 8).
+        clip (float): Batas pemotongan histogram per tile (default 2.0).
+
+    Returns:
+        PIL.Image.Image: Citra RGB hasil enhancement, ukuran sama.
+    """
     gray = ImageOps.grayscale(pil_image)
     arr = np.array(gray).astype(np.float64)
     height, width = arr.shape
@@ -35,6 +47,18 @@ def enhance_clahe(pil_image, tiles=8, clip=2.0):
 
 
 def enhance(pil_image, method="none"):
+    """Dispatcher enhancement kontras citra.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        method (str): "none" (tanpa perubahan) atau "clahe".
+
+    Returns:
+        PIL.Image.Image: Citra hasil sesuai metode terpilih.
+
+    Raises:
+        ValueError: Jika nama metode tidak dikenal.
+    """
     if method == "none":
         return pil_image
     if method == "clahe":
@@ -43,10 +67,28 @@ def enhance(pil_image, method="none"):
 
 
 def _to_gray_float(pil_image):
+    """Konversi citra ke array grayscale float64 untuk komputasi metrik.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+
+    Returns:
+        numpy.ndarray: Array 2D grayscale bertipe float64.
+    """
     return np.array(ImageOps.grayscale(pil_image)).astype(np.float64)
 
 
 def psnr(img_a, img_b, max_val=255.0):
+    """Peak Signal-to-Noise Ratio antara dua citra (semakin besar semakin mirip).
+
+    Args:
+        img_a (PIL.Image.Image): Citra referensi (mis. asli).
+        img_b (PIL.Image.Image): Citra pembanding (mis. hasil denoise).
+        max_val (float): Nilai piksel maksimum (default 255.0).
+
+    Returns:
+        float: Nilai PSNR dalam dB; tak hingga bila kedua citra identik.
+    """
     image_a = _to_gray_float(img_a)
     image_b = _to_gray_float(img_b)
     if image_a.shape != image_b.shape:
@@ -60,7 +102,20 @@ def psnr(img_a, img_b, max_val=255.0):
 
 
 def ssim(img_a, img_b, max_val=255.0, sigma=1.5):
-    """Simplified single-scale SSIM with Gaussian weighting."""
+    """Structural Similarity satu skala dengan pembobotan Gaussian.
+
+    Menilai kemiripan struktur (luminans, kontras) yang lebih sesuai persepsi
+    dibanding selisih piksel mentah.
+
+    Args:
+        img_a (PIL.Image.Image): Citra referensi.
+        img_b (PIL.Image.Image): Citra pembanding.
+        max_val (float): Nilai piksel maksimum (default 255.0).
+        sigma (float): Lebar jendela Gaussian (default 1.5).
+
+    Returns:
+        float: Skor SSIM pada rentang [-1, 1]; 1 berarti identik.
+    """
     image_a = _to_gray_float(img_a)
     image_b = _to_gray_float(img_b)
     if image_a.shape != image_b.shape:
@@ -80,6 +135,15 @@ def ssim(img_a, img_b, max_val=255.0, sigma=1.5):
 
 
 def summarize(values):
+    """Ringkasan statistik daftar nilai (melewati None dan non-finit).
+
+    Args:
+        values (list): Daftar nilai numerik atau None.
+
+    Returns:
+        dict: Cacah (n), rata-rata (mean), simpangan baku (std),
+            minimum (min), dan maksimum (max).
+    """
     arr = np.array(
         [value for value in values if value is not None and math.isfinite(value)],
         dtype=float,

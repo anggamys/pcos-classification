@@ -16,12 +16,28 @@ from scipy import ndimage as ndi
 
 
 def to_grayscale_array(pil_image):
+    """Konversi citra ke array grayscale float64 untuk komputasi ambang.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+
+    Returns:
+        numpy.ndarray: Array 2D grayscale bertipe float64.
+    """
     gray = ImageOps.grayscale(pil_image)
     return np.array(gray).astype(np.float64)
 
 
 def otsu_threshold(gray, nbins=256):
-    """Compute Otsu threshold for a grayscale array in [0, 255]."""
+    """Threshold Otsu: ambang yang memaksimalkan varians antar-kelas.
+
+    Args:
+        gray (numpy.ndarray): Array grayscale rentang [0, 255].
+        nbins (int): Jumlah bin histogram (default 256).
+
+    Returns:
+        float: Nilai ambang Otsu.
+    """
     hist, bin_edges = np.histogram(gray.ravel(), bins=nbins, range=(0, 255))
     hist = hist.astype(np.float64)
     pixel_total = hist.sum()
@@ -43,7 +59,19 @@ def otsu_threshold(gray, nbins=256):
 
 
 def adaptive_mean_threshold(gray, window=31, offset=7.0):
-    """Local-mean adaptive threshold (dark pixels below local mean - offset)."""
+    """Peta ambang adaptif: rata-rata lokal dikurangi offset per piksel.
+
+    Piksel di bawah ambang lokalnya dianggap gelap (kandidat folikel),
+    sehingga tahan terhadap iluminasi tak merata.
+
+    Args:
+        gray (numpy.ndarray): Array grayscale.
+        window (int): Ukuran jendela rata-rata lokal (default 31).
+        offset (float): Pengurang ambang (default 7.0).
+
+    Returns:
+        numpy.ndarray: Peta ambang seukuran citra masukan.
+    """
     if window % 2 == 0:
         window += 1
     local_mean = ndi.uniform_filter(gray.astype(np.float64), size=window)
@@ -51,6 +79,14 @@ def adaptive_mean_threshold(gray, window=31, offset=7.0):
 
 
 def _disk(radius):
+    """Elemen struktur cakram untuk operasi morfologi biner.
+
+    Args:
+        radius (int): Jari-jari cakram dalam piksel.
+
+    Returns:
+        numpy.ndarray: Mask boolean berbentuk cakram.
+    """
     disk_radius = int(max(radius, 1))
     row_coords, col_coords = np.ogrid[
         -disk_radius : disk_radius + 1, -disk_radius : disk_radius + 1
@@ -61,10 +97,31 @@ def _disk(radius):
 
 
 def _label_mask(mask):
+    """Pelabelan komponen terhubung dengan anotasi tipe statis.
+
+    Args:
+        mask (numpy.ndarray): Mask boolean masukan.
+
+    Returns:
+        tuple: Pasangan (array berlabel, jumlah label).
+    """
     return cast(tuple[np.ndarray, int], ndi.label(mask))
 
 
 def cleanup_mask(mask, open_radius=2, close_radius=3, min_area=80, remove_border=True):
+    """Bersihkan mask: morfologi, buang komponen tepi, saring luas minimum.
+
+    Args:
+        mask (numpy.ndarray): Mask boolean mentah.
+        open_radius (int): Jari-jari opening untuk memutus jembatan noise.
+        close_radius (int): Jari-jari closing untuk menutup lubang kecil.
+        min_area (int): Luas minimum region dalam piksel.
+        remove_border (bool): Buang komponen yang menyentuh tepi citra
+            (umumnya background, bukan folikel).
+
+    Returns:
+        numpy.ndarray: Mask boolean hasil pembersihan.
+    """
     cleaned = ndi.binary_opening(mask, structure=_disk(open_radius))
     cleaned = ndi.binary_closing(cleaned, structure=_disk(close_radius))
     labeled, num_labels = _label_mask(cleaned)
@@ -98,6 +155,22 @@ def segment_otsu(
     max_coverage=0.5,
     fallback_percentile=15.0,
 ):
+    """Segmentasi kandidat folikel dengan threshold Otsu + fallback persentil.
+
+    Bila mask Otsu mencakup lebih dari `max_coverage` citra (Otsu mengunci
+    split background/jaringan), dipakai ambang persentil tergelap.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        open_radius (int): Jari-jari opening morfologi.
+        close_radius (int): Jari-jari closing morfologi.
+        min_area (int): Luas minimum region dalam piksel.
+        max_coverage (float): Batas cakupan wajar sebelum fallback (default 0.5).
+        fallback_percentile (float): Persentil gelap untuk ambang cadangan.
+
+    Returns:
+        numpy.ndarray: Mask boolean kandidat folikel.
+    """
     gray = to_grayscale_array(pil_image)
     threshold = otsu_threshold(gray)
     mask = cleanup_mask(gray < threshold, open_radius, close_radius, min_area)
@@ -111,6 +184,19 @@ def segment_otsu(
 def segment_adaptive(
     pil_image, window=31, offset=7.0, open_radius=2, close_radius=3, min_area=80
 ):
+    """Segmentasi kandidat folikel dengan threshold rata-rata lokal adaptif.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        window (int): Ukuran jendela rata-rata lokal.
+        offset (float): Pengurang ambang lokal.
+        open_radius (int): Jari-jari opening morfologi.
+        close_radius (int): Jari-jari closing morfologi.
+        min_area (int): Luas minimum region dalam piksel.
+
+    Returns:
+        numpy.ndarray: Mask boolean kandidat folikel.
+    """
     gray = to_grayscale_array(pil_image)
     local_threshold = adaptive_mean_threshold(gray, window=window, offset=offset)
     dark_pixels = gray < local_threshold
@@ -118,6 +204,19 @@ def segment_adaptive(
 
 
 def segment(pil_image, method="otsu", **kwargs):
+    """Dispatcher segmentasi kandidat folikel.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        method (str): "none" (mask kosong), "otsu", atau "adaptive".
+        **kwargs: Parameter lanjutan diteruskan ke fungsi metode terpilih.
+
+    Returns:
+        numpy.ndarray: Mask boolean kandidat folikel.
+
+    Raises:
+        ValueError: Jika nama metode tidak dikenal.
+    """
     if method == "none":
         arr = to_grayscale_array(pil_image)
         return np.zeros(arr.shape, dtype=bool)
@@ -129,6 +228,16 @@ def segment(pil_image, method="otsu", **kwargs):
 
 
 def analyze_regions(mask):
+    """Hitung statistik region pada mask (untuk evaluasi sisi PCD).
+
+    Args:
+        mask (numpy.ndarray): Mask boolean kandidat folikel.
+
+    Returns:
+        dict: Cacah region (num_regions), proporsi cakupan (coverage),
+            luas rata-rata (mean_area), luas maksimum (max_area), dan kotak
+            pembatas region terbesar (bounding_box, None bila kosong).
+    """
     mask = np.asarray(mask, dtype=bool)
     labeled, region_count = _label_mask(mask)
     total_pixels = mask.size
@@ -167,6 +276,16 @@ def analyze_regions(mask):
 
 
 def union_bounding_box(mask, pad=8):
+    """Kotak pembatas gabungan seluruh region + padding.
+
+    Args:
+        mask (numpy.ndarray): Mask boolean kandidat folikel.
+        pad (int): Padding di tiap sisi dalam piksel (default 8).
+
+    Returns:
+        tuple atau None: (x_min, y_min, x_max, y_max); None bila mask kosong
+            atau kotak tidak valid.
+    """
     y_coords, x_coords = np.nonzero(np.asarray(mask, dtype=bool))
     if len(x_coords) == 0:
         return None
@@ -185,6 +304,16 @@ def union_bounding_box(mask, pad=8):
 
 
 def apply_roi_crop(pil_image, mask, pad=8):
+    """Potong citra ke kotak pembatas gabungan region (mode input "roi").
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        mask (numpy.ndarray): Mask boolean kandidat folikel.
+        pad (int): Padding di tiap sisi dalam piksel (default 8).
+
+    Returns:
+        PIL.Image.Image: Citra hasil crop; citra asli bila mask kosong.
+    """
     bounding_box = union_bounding_box(mask, pad=pad)
     if bounding_box is None:
         return pil_image
@@ -192,6 +321,19 @@ def apply_roi_crop(pil_image, mask, pad=8):
 
 
 def apply_masked(pil_image, mask, background=0):
+    """Pertahankan piksel region, nolkan background (mode input "masked").
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        mask (numpy.ndarray): Mask boolean kandidat folikel.
+        background (int): Nilai piksel background (default 0).
+
+    Returns:
+        PIL.Image.Image: Citra dengan background diganti nilai background.
+
+    Raises:
+        ValueError: Jika ukuran mask tidak sama dengan ukuran citra.
+    """
     image_array = np.array(pil_image)
     binary_mask = np.asarray(mask, dtype=bool)
     if binary_mask.shape != image_array.shape[:2]:
@@ -204,6 +346,17 @@ def apply_masked(pil_image, mask, background=0):
 
 
 def overlay_mask(pil_image, mask, color=(255, 0, 0), alpha=90):
+    """Tumpangkan mask transparan di atas citra untuk visualisasi laporan.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        mask (numpy.ndarray): Mask boolean kandidat folikel.
+        color (tuple): Warna overlay RGB (default merah).
+        alpha (int): Opasitas overlay 0-255 (default 90).
+
+    Returns:
+        PIL.Image.Image: Citra RGB dengan overlay mask.
+    """
     base = pil_image.convert("RGBA")
     overlay = Image.new("RGBA", base.size, color + (0,))
     alpha_layer = Image.fromarray(

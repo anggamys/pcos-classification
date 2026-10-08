@@ -7,6 +7,19 @@ from torchvision import transforms
 
 
 class PCOSDataset(Dataset):
+    """Dataset citra USG ovarium (PCOS vs sehat) + preprocessing PCD.
+
+    Args:
+        root_dir (str atau Path): Direktori berisi subfolder `infected`
+            (label 1) dan `noninfected` (label 0).
+        transform: Transform torchvision yang diterapkan setelah preprocessing.
+        denoise (bool): Terapkan wavelet denoising BayesShrink.
+        enhance (str): "none" atau "clahe".
+        segment (str): "none", "otsu", atau "adaptive".
+        input_mode (str): "full" (citra utuh), "roi" (crop), atau "masked".
+        seg_pad (int): Padding ROI dalam piksel.
+    """
+
     def __init__(
         self,
         root_dir,
@@ -32,9 +45,18 @@ class PCOSDataset(Dataset):
                 self.samples.append((str(img_name), label))
 
     def __len__(self):
+        """Cacah seluruh sampel (infected + noninfected)."""
         return len(self.samples)
 
     def __getitem__(self, idx):
+        """Ambil satu sampel: preprocessing PCD lalu transform.
+
+        Args:
+            idx (int): Indeks sampel.
+
+        Returns:
+            tuple: Pasangan (citra tensor/PIL, label 0/1).
+        """
         img_path, label = self.samples[idx]
         image = Image.open(img_path).convert("RGB")
 
@@ -68,15 +90,32 @@ class PCOSDataset(Dataset):
 
 
 class TransformedSubset(Dataset):
+    """Subset indeks dengan transform terpisah untuk train/val/test.
+
+    Args:
+        dataset (Dataset): Dataset sumber yang sudah di-preprocessing.
+        indices: Daftar indeks sampel subset ini.
+        transform: Transform torchvision khusus subset ini.
+    """
+
     def __init__(self, dataset, indices, transform):
         self.dataset = dataset
         self.indices = indices
         self.transform = transform
 
     def __len__(self):
+        """Cacah sampel dalam subset."""
         return len(self.indices)
 
     def __getitem__(self, idx):
+        """Ambil sampel subset lalu terapkan transform.
+
+        Args:
+            idx (int): Indeks dalam subset (bukan indeks dataset).
+
+        Returns:
+            tuple: Pasangan (citra, label).
+        """
         img, label = self.dataset[self.indices[idx]]
         if self.transform:
             img = self.transform(img)
@@ -84,6 +123,18 @@ class TransformedSubset(Dataset):
 
 
 def get_transforms(train=True, image_size=224):
+    """Susun transform torchvision untuk train atau evaluasi.
+
+    Train memakai augmentasi (rotasi, flip, crop acak); evaluasi hanya
+    resize + normalisasi ImageNet.
+
+    Args:
+        train (bool): True untuk pipeline training beraugmentasi.
+        image_size (int): Ukuran resize persegi (default 224).
+
+    Returns:
+        torchvision.transforms.Compose: Rangkaian transform siap pakai.
+    """
     if train:
         return transforms.Compose(
             [
@@ -118,6 +169,24 @@ def create_dataloaders(
     seg_pad=8,
     num_workers=4,
 ):
+    """Bagi dataset (seed 42) dan bangun tiga DataLoader train/val/test.
+
+    Args:
+        root_dir (str atau Path): Direktori dataset.
+        batch_size (int): Ukuran batch.
+        image_size (int): Ukuran resize persegi.
+        train_ratio (float): Proporsi train.
+        val_ratio (float): Proporsi validasi (sisanya untuk test).
+        denoise (bool): Wavelet denoising BayesShrink.
+        enhance (str): "none" atau "clahe".
+        segment (str): "none", "otsu", atau "adaptive".
+        input_mode (str): "full", "roi", atau "masked".
+        seg_pad (int): Padding ROI dalam piksel.
+        num_workers (int): Pekerja DataLoader.
+
+    Returns:
+        tuple: (train_loader, val_loader, test_loader).
+    """
     train_transform = get_transforms(train=True, image_size=image_size)
     val_transform = get_transforms(train=False, image_size=image_size)
 

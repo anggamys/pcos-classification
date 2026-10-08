@@ -15,6 +15,19 @@ REQUIRED_KEYS = ["id", "desc", "denoise"] + list(VALID_CHOICES)
 
 
 def load_config(config_path):
+    """Muat dan validasi YAML matriks eksperimen sebagai sumber tunggal.
+
+    Args:
+        config_path (str atau Path): Path file experiments.yml.
+
+    Returns:
+        tuple: (defaults, experiments) dengan tiap eksperimen sudah
+            digabung bersama defaults.
+
+    Raises:
+        ValueError: Bila ada key wajib hilang, pilihan tak valid,
+            atau id eksperimen ganda.
+    """
     with open(config_path) as handle:
         raw = yaml.safe_load(handle)
     defaults = raw.get("defaults", {})
@@ -39,6 +52,15 @@ def load_config(config_path):
 
 
 def resolve_overrides(args, experiments):
+    """Terapkan flag CLI eksplisit di atas nilai YAML.
+
+    Args:
+        args (argparse.Namespace): Argumen CLI (hanya yang tak-None dipakai).
+        experiments (list): Daftar dict eksperimen hasil `load_config`.
+
+    Returns:
+        list: Daftar eksperimen yang sama, sudah ditimpa override.
+    """
     """Apply explicit CLI flags on top of the YAML values."""
     overrides = {
         key: value
@@ -52,6 +74,18 @@ def resolve_overrides(args, experiments):
 
 
 def select_experiments(experiments, only):
+    """Saring eksperimen berdasarkan flag --only.
+
+    Args:
+        experiments (list): Daftar dict eksperimen.
+        only (str): Daftar id koma-pisah (mis. "E1,E2"); kosong = semua.
+
+    Returns:
+        list: Subset eksperimen terpilih.
+
+    Raises:
+        ValueError: Bila ada id tak dikenal, disertai id yang valid.
+    """
     wanted = {item.strip() for item in only.split(",") if item.strip()}
     known_ids = [experiment["id"] for experiment in experiments]
     unknown = wanted - set(known_ids)
@@ -68,4 +102,9 @@ def select_experiments(experiments, only):
 
 
 def project_root():
+    """Path akar proyek (induk folder experiments).
+
+    Returns:
+        pathlib.Path: Direktori akar proyek.
+    """
     return Path(__file__).resolve().parent.parent

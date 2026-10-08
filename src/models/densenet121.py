@@ -9,7 +9,6 @@ class DenseNet121Attention(nn.Module):
     """DenseNet-121 pretrained + modul attention + classifier biner PCOS.
 
     Args:
-        num_classes (int): Jumlah kelas keluaran (default 1, logit biner).
         pretrained (bool): Muat bobot ImageNet bila True.
         dropout (float): Laju dropout classifier.
         attention_type (str): "self_attention", "se_net", "cbam",
@@ -18,11 +17,12 @@ class DenseNet121Attention(nn.Module):
 
     def __init__(
         self,
-        pretrained=True,
-        dropout=0.3,
-        attention_type="self_attention",
-    ):
+        pretrained: bool = True,
+        dropout: float = 0.3,
+        attention_type: str = "self_attention",
+    ) -> None:
         super().__init__()
+
         weights = DenseNet121_Weights.IMAGENET1K_V1 if pretrained else None
         self.backbone = densenet121(weights=weights)
 
@@ -33,19 +33,24 @@ class DenseNet121Attention(nn.Module):
         if attention_type == "self_attention":
             self.attention = SelfAttention(embed_dim=feature_dim, num_heads=8)
             self.use_2d = False
+
         elif attention_type == "se_net":
             final_channels = 1024
             self.attention = SEAttention(channels=final_channels, reduction=16)
             self.use_2d = True
+
         elif attention_type == "cbam":
             final_channels = 1024
             self.attention = CBAMAttention(channels=final_channels, reduction=16)
             self.use_2d = True
+
         elif attention_type == "transformer":
             self.attention = TransformerAttention(
                 embed_dim=feature_dim, num_heads=8, num_layers=2, dropout=dropout
             )
+
             self.use_2d = False
+
         else:
             raise ValueError(f"Unknown attention_type: {attention_type}")
 
@@ -56,7 +61,7 @@ class DenseNet121Attention(nn.Module):
             nn.Linear(256, 1),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward: ekstraksi fitur, attention, lalu logit biner.
 
         Args:
@@ -71,6 +76,7 @@ class DenseNet121Attention(nn.Module):
             features = self.attention(features)
             features = torch.nn.functional.adaptive_avg_pool2d(features, 1)
             features = features.view(features.size(0), -1)
+
         else:
             features = torch.nn.functional.adaptive_avg_pool2d(features, 1)
             features = features.view(features.size(0), -1)
@@ -80,4 +86,5 @@ class DenseNet121Attention(nn.Module):
             features = features.squeeze(1)
 
         out = self.classifier(features)
+
         return out

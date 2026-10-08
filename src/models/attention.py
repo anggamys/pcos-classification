@@ -10,7 +10,7 @@ class SelfAttention(nn.Module):
         num_heads (int): Jumlah attention head (default 8).
     """
 
-    def __init__(self, embed_dim, num_heads=8):
+    def __init__(self, embed_dim: int, num_heads: int = 8) -> None:
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
@@ -20,7 +20,7 @@ class SelfAttention(nn.Module):
         self.proj = nn.Linear(embed_dim, embed_dim)
         self.norm = nn.LayerNorm(embed_dim)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Terapkan self-attention multi-head pada sekuens token.
 
         Args:
@@ -51,8 +51,9 @@ class SEAttention(nn.Module):
         reduction (int): Rasio reduksi bottleneck eksitasi (default 16).
     """
 
-    def __init__(self, channels, reduction=16):
+    def __init__(self, channels: int, reduction: int = 16) -> None:
         super().__init__()
+
         self.squeeze = nn.AdaptiveAvgPool2d(1)
         self.excitation = nn.Sequential(
             nn.Linear(channels, channels // reduction, bias=False),
@@ -61,7 +62,7 @@ class SEAttention(nn.Module):
             nn.Sigmoid(),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Kalikan feature map dengan bobot kanal hasil eksitasi.
 
         Args:
@@ -73,6 +74,7 @@ class SEAttention(nn.Module):
         B, C, _, _ = x.shape
         channel_weights = self.squeeze(x).view(B, C)
         channel_weights = self.excitation(channel_weights).view(B, C, 1, 1)
+
         return x * channel_weights.expand_as(x)
 
 
@@ -85,12 +87,14 @@ class CBAMAttention(nn.Module):
         kernel_size (int): Ukuran kernel gerbang spasial (default 7).
     """
 
-    def __init__(self, channels, reduction=16, kernel_size=7):
+    def __init__(
+        self, channels: int, reduction: int = 16, kernel_size: int = 7
+    ) -> None:
         super().__init__()
         self.channel_gate = ChannelGate(channels, reduction)
         self.spatial_gate = SpatialGate(kernel_size)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Terapkan gerbang kanal lalu gerbang spasial berurutan.
 
         Args:
@@ -101,6 +105,7 @@ class CBAMAttention(nn.Module):
         """
         x = self.channel_gate(x)
         x = self.spatial_gate(x)
+
         return x
 
 
@@ -112,18 +117,21 @@ class ChannelGate(nn.Module):
         reduction (int): Rasio reduksi lapisan fully-connected.
     """
 
-    def __init__(self, channels, reduction=16):
+    def __init__(self, channels: int, reduction: int = 16) -> None:
         super().__init__()
+
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
+
         self.fc = nn.Sequential(
             nn.Linear(channels, channels // reduction, bias=False),
             nn.ReLU(inplace=True),
             nn.Linear(channels // reduction, channels, bias=False),
         )
+
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Bobotkan tiap kanal dari statistik pooled rata-rata + maksimum.
 
         Args:
@@ -136,6 +144,7 @@ class ChannelGate(nn.Module):
         avg_out = self.fc(self.avg_pool(x).view(B, C))
         max_out = self.fc(self.max_pool(x).view(B, C))
         channel_weights = self.sigmoid(avg_out + max_out).view(B, C, 1, 1)
+
         return x * channel_weights.expand_as(x)
 
 
@@ -146,12 +155,13 @@ class SpatialGate(nn.Module):
         kernel_size (int): Ukuran kernel konvolusi gerbang (default 7).
     """
 
-    def __init__(self, kernel_size=7):
+    def __init__(self, kernel_size: int = 7) -> None:
         super().__init__()
+
         self.conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Bobotkan tiap lokasi spasial dari peta agregat kanal.
 
         Args:
@@ -162,8 +172,10 @@ class SpatialGate(nn.Module):
         """
         avg_out = torch.mean(x, dim=1, keepdim=True)
         max_out, _ = torch.max(x, dim=1, keepdim=True)
+
         spatial_weights = torch.cat([avg_out, max_out], dim=1)
         spatial_weights = self.sigmoid(self.conv(spatial_weights))
+
         return x * spatial_weights
 
 
@@ -177,8 +189,15 @@ class TransformerAttention(nn.Module):
         dropout (float): Laju dropout (default 0.1).
     """
 
-    def __init__(self, embed_dim, num_heads=8, num_layers=2, dropout=0.1):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int = 8,
+        num_layers: int = 2,
+        dropout: float = 0.1,
+    ) -> None:
         super().__init__()
+
         self.embed_dim = embed_dim
         self.num_heads = num_heads
 
@@ -189,10 +208,11 @@ class TransformerAttention(nn.Module):
             dropout=dropout,
             batch_first=True,
         )
+
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.norm = nn.LayerNorm(embed_dim)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Lewatkan token melalui encoder transformer + normalisasi.
 
         Args:
@@ -203,4 +223,5 @@ class TransformerAttention(nn.Module):
         """
         x = self.transformer(x)
         x = self.norm(x)
+
         return x

@@ -1,8 +1,11 @@
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
+from torch.utils.data import DataLoader
 
 
 class GradCAM:
@@ -13,7 +16,7 @@ class GradCAM:
         target_layer (torch.nn.Module): Lapisan konvolusi target heatmap.
     """
 
-    def __init__(self, model, target_layer):
+    def __init__(self, model: torch.nn.Module, target_layer: torch.nn.Module) -> None:
         self.model = model
         self.target_layer = target_layer
         self.gradients = None
@@ -22,15 +25,21 @@ class GradCAM:
         target_layer.register_forward_hook(self._forward_hook)
         target_layer.register_full_backward_hook(self._backward_hook)
 
-    def _forward_hook(self, module, input, output):
+    def _forward_hook(
+        self, module: torch.nn.Module, input: tuple, output: torch.Tensor
+    ) -> None:
         """Simpan aktivasi lapisan target saat forward pass."""
         self.activations = output.detach()
 
-    def _backward_hook(self, module, grad_input, grad_output):
+    def _backward_hook(
+        self, _module: torch.nn.Module, _grad_input: Any, grad_output: Any
+    ) -> None:
         """Simpan gradien lapisan target saat backward pass."""
         self.gradients = grad_output[0].detach()
 
-    def generate(self, input_tensor, target_class=None):
+    def generate(
+        self, input_tensor: torch.Tensor, target_class: int | None = None
+    ) -> np.ndarray:
         """Hasilkan heatmap Grad-CAM ternormalisasi [0, 1].
 
         Args:
@@ -55,18 +64,26 @@ class GradCAM:
             )
 
         weights = self.gradients.mean(dim=(2, 3), keepdim=True)
+
         cam = (weights * self.activations).sum(dim=1, keepdim=True)
         cam = F.relu(cam)
 
         cam = F.interpolate(
             cam, size=input_tensor.shape[2:], mode="bilinear", align_corners=False
         )
+
         cam = cam - cam.min()
         cam = cam / (cam.max() + 1e-8)
 
         return cam.squeeze().cpu().numpy()
 
-    def visualize(self, input_tensor, image, target_class=None, save_path=None):
+    def visualize(
+        self,
+        input_tensor: torch.Tensor,
+        image: Image.Image | np.ndarray,
+        target_class: int | None = None,
+        save_path: str | None = None,
+    ) -> None:
         """Tampilkan panel asli, heatmap, dan overlay Grad-CAM.
 
         Args:
@@ -96,12 +113,14 @@ class GradCAM:
         axes[2].axis("off")
 
         plt.tight_layout()
+
         if save_path:
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
         plt.show()
 
 
-def get_gradcam_target_layer(model):
+def get_gradcam_target_layer(model: torch.nn.Module) -> torch.nn.Module | None:
     """Cari lapisan konvolusi terakhir backbone untuk Grad-CAM.
 
     Args:
@@ -110,16 +129,32 @@ def get_gradcam_target_layer(model):
     Returns:
         torch.nn.Module atau None: Lapisan target; None bila tak ditemukan.
     """
-    if hasattr(model, "backbone") and hasattr(model.backbone, "features"):
-        features = model.backbone.features
-        if hasattr(features, "denseblock4"):
-            return features.denseblock4
-        elif hasattr(features, "norm5"):
-            return features.norm5
+    backbone = getattr(model, "backbone", None)
+    if not isinstance(backbone, torch.nn.Module):
+        return None
+
+    features = getattr(backbone, "features", None)
+    if not isinstance(features, torch.nn.Module):
+        return None
+
+    denseblock4 = getattr(features, "denseblock4", None)
+    if isinstance(denseblock4, torch.nn.Module):
+        return denseblock4
+
+    norm5 = getattr(features, "norm5", None)
+    if isinstance(norm5, torch.nn.Module):
+        return norm5
+
     return None
 
 
-def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkpoints"):
+def visualize_gradcam(
+    model: torch.nn.Module,
+    dataloader: DataLoader,
+    device: torch.device,
+    num_samples: int = 5,
+    save_dir: str = "checkpoints",
+) -> None:
     """Hasilkan figure Grad-CAM beberapa sampel test ke direktori run.
 
     Args:
@@ -134,6 +169,7 @@ def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkp
 
     if target_layer is None:
         print("Could not find target layer for Grad-CAM")
+
         return
 
     gradcam = GradCAM(model, target_layer)
@@ -169,6 +205,7 @@ def visualize_gradcam(model, dataloader, device, num_samples=5, save_dir="checkp
             axes[count, 1].set_title(
                 f"Grad-CAM\nPred: {'PCOS' if prediction else 'Normal'}"
             )
+
             axes[count, 1].axis("off")
 
             axes[count, 2].imshow(img_display)

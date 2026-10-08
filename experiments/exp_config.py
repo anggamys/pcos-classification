@@ -1,5 +1,6 @@
 """Experiment matrix configuration: YAML loading and validation."""
 
+import argparse
 from pathlib import Path
 
 import yaml
@@ -14,7 +15,7 @@ VALID_CHOICES = {
 REQUIRED_KEYS = ["id", "desc", "denoise"] + list(VALID_CHOICES)
 
 
-def load_config(config_path):
+def load_config(config_path: str | Path) -> tuple[dict, list]:
     """Muat dan validasi YAML matriks eksperimen sebagai sumber tunggal.
 
     Args:
@@ -30,28 +31,36 @@ def load_config(config_path):
     """
     with open(config_path) as handle:
         raw = yaml.safe_load(handle)
+
     defaults = raw.get("defaults", {})
     experiments = []
+
     for position, item in enumerate(raw.get("experiments", []), start=1):
         merged = dict(defaults)
         merged.update(item)
         missing = [key for key in REQUIRED_KEYS if key not in merged]
+
         if missing:
             raise ValueError(f"Experiment #{position} missing keys: {missing}")
+
         for key, choices in VALID_CHOICES.items():
             if merged[key] not in choices:
                 raise ValueError(
                     f"Experiment {merged.get('id', position)}: invalid {key} "
                     f"{merged[key]!r}, expected one of {choices}"
                 )
+
         experiments.append(merged)
+
     ids = [experiment["id"] for experiment in experiments]
+
     if len(set(ids)) != len(ids):
         raise ValueError(f"Duplicate experiment ids: {ids}")
+
     return defaults, experiments
 
 
-def resolve_overrides(args, experiments):
+def resolve_overrides(args: argparse.Namespace, experiments: list) -> list:
     """Terapkan flag CLI eksplisit di atas nilai YAML.
 
     Args:
@@ -68,12 +77,14 @@ def resolve_overrides(args, experiments):
         if key in ("data_dir", "epochs", "batch_size", "gradcam_samples", "out_dir")
         and value is not None
     }
+
     for experiment in experiments:
         experiment.update(overrides)
+
     return experiments
 
 
-def select_experiments(experiments, only):
+def select_experiments(experiments: list, only: str) -> list:
     """Saring eksperimen berdasarkan flag --only.
 
     Args:
@@ -89,19 +100,22 @@ def select_experiments(experiments, only):
     wanted = {item.strip() for item in only.split(",") if item.strip()}
     known_ids = [experiment["id"] for experiment in experiments]
     unknown = wanted - set(known_ids)
+
     if unknown:
         raise ValueError(
             f"Unknown experiment ids: {sorted(unknown)}, valid: {known_ids}"
         )
+
     selected = [
         experiment
         for experiment in experiments
         if not wanted or experiment["id"] in wanted
     ]
+
     return selected
 
 
-def project_root():
+def project_root() -> Path:
     """Path akar proyek (induk folder experiments).
 
     Returns:

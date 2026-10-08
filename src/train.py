@@ -6,10 +6,19 @@ from torch import nn
 from torch.amp import GradScaler, autocast
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device, scaler, use_amp):
+def train_one_epoch(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+    scaler: GradScaler,
+    use_amp: bool,
+) -> tuple[float, float]:
     """Satu epoch pelatihan dengan mixed precision.
 
     Args:
@@ -52,7 +61,13 @@ def train_one_epoch(model, loader, criterion, optimizer, device, scaler, use_amp
 
 
 @torch.no_grad()
-def validate(model, loader, criterion, device, use_amp):
+def validate(
+    model: nn.Module,
+    loader: DataLoader,
+    criterion: nn.Module,
+    device: torch.device,
+    use_amp: bool,
+) -> tuple[float, float]:
     """Evaluasi model pada data validasi tanpa gradient.
 
     Args:
@@ -86,7 +101,9 @@ def validate(model, loader, criterion, device, use_amp):
     return total_loss / total, correct / total
 
 
-def train(model, train_loader, val_loader, config):
+def train(
+    model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, config: dict
+) -> dict:
     """Loop pelatihan: Adam + ReduceLROnPlateau + early stopping.
 
     Model terbaik (val loss terkecil) disimpan ke `best_model.pth` di
@@ -114,9 +131,11 @@ def train(model, train_loader, val_loader, config):
     scaler = GradScaler(enabled=use_amp)
 
     criterion = nn.BCEWithLogitsLoss()
+
     optimizer = Adam(
         model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
     )
+
     scheduler = ReduceLROnPlateau(optimizer, mode="min", patience=5, factor=0.5)
 
     best_val_loss = float("inf")
@@ -127,13 +146,16 @@ def train(model, train_loader, val_loader, config):
     save_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Training on {device}")
+
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         total_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
         print(f"VRAM: {total_mem:.1f} GB | AMP: enabled (float16)")
+
     print(
         f"Epochs: {config['epochs']}, LR: {config['lr']}, Batch: {config['batch_size']}"
     )
+
     print("-" * 60)
 
     for epoch in range(config["epochs"]):
@@ -142,6 +164,7 @@ def train(model, train_loader, val_loader, config):
         train_loss, train_acc = train_one_epoch(
             model, train_loader, criterion, optimizer, device, scaler, use_amp
         )
+
         val_loss, val_acc = validate(model, val_loader, criterion, device, use_amp)
 
         scheduler.step(val_loss)
@@ -152,6 +175,7 @@ def train(model, train_loader, val_loader, config):
         history["val_acc"].append(val_acc)
 
         elapsed = time.time() - start
+
         print(
             f"Epoch {epoch + 1}/{config['epochs']} ({elapsed:.1f}s) - "
             f"Train Loss: {train_loss:.4f} Acc: {train_acc:.4f} - "
@@ -161,6 +185,7 @@ def train(model, train_loader, val_loader, config):
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             patience_counter = 0
+
             torch.save(
                 {
                     "epoch": epoch,
@@ -171,9 +196,12 @@ def train(model, train_loader, val_loader, config):
                 },
                 save_dir / "best_model.pth",
             )
+
             print(f"  -> Saved best model (val_loss: {val_loss:.4f})")
+
         else:
             patience_counter += 1
+
             if patience_counter >= config.get("patience", 10):
                 print(f"Early stopping at epoch {epoch + 1}")
                 break

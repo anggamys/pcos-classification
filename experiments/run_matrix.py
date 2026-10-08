@@ -19,29 +19,26 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import torch
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 _EXPERIMENTS_DIR = Path(__file__).resolve().parent
 if str(_EXPERIMENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_EXPERIMENTS_DIR))
 
-try:
-    from experiments.exp_config import (
-        load_config,
-        project_root,
-        resolve_overrides,
-        select_experiments,
-    )
-    from experiments.hypotheses import evaluate_hypotheses
-except ImportError:  # dijalankan langsung: python experiments/run_matrix.py
-    from exp_config import (
-        load_config,
-        project_root,
-        resolve_overrides,
-        select_experiments,
-    )
-    from hypotheses import evaluate_hypotheses
+from exp_config import (
+    load_config,
+    project_root,
+    resolve_overrides,
+    select_experiments,
+)
+from hypotheses import evaluate_hypotheses
+
+from src.models.densenet121 import DenseNet121Attention
 
 PROJECT_ROOT = project_root()
-sys.path.insert(0, str(PROJECT_ROOT))
 
 MAIN_FLAGS = [
     ("--data-dir", "data_dir"),
@@ -71,7 +68,7 @@ METRIC_RE = {
 }
 
 
-def parse_metrics(stdout):
+def parse_metrics(stdout: str) -> dict:
     """Urai metrik (Accuracy/AUC/...) dari stdout main.py via regex.
 
     Args:
@@ -87,7 +84,7 @@ def parse_metrics(stdout):
     return metrics
 
 
-def model_stats(attention, repeats=20):
+def model_stats(attention: str, repeats: int = 20) -> tuple[int, float]:
     """Hitung parameter dan latency inferensi CPU (bukti efisiensi H3).
 
     Args:
@@ -97,28 +94,25 @@ def model_stats(attention, repeats=20):
     Returns:
         tuple: (total parameter, latency ms per forward di CPU).
     """
-    """Total params + CPU inference latency (efficiency evidence for H3)."""
-    import torch
-
-    from src.models.densenet121 import DenseNet121Attention
-
-    model = DenseNet121Attention(
-        num_classes=1, pretrained=False, attention_type=attention
-    )
+    model = DenseNet121Attention(pretrained=False, attention_type=attention)
     model.eval()
     total_params = sum(p.numel() for p in model.parameters())
     sample_input = torch.randn(1, 3, 224, 224)
+
     with torch.no_grad():
         for _ in range(5):
             _ = model(sample_input)
+
         start_time = time.perf_counter()
         for _ in range(repeats):
             _ = model(sample_input)
+
         elapsed_ms = (time.perf_counter() - start_time) / repeats * 1000.0
+
     return total_params, round(elapsed_ms, 2)
 
 
-def build_command(experiment, save_dir):
+def build_command(experiment: dict, save_dir: Path) -> list:
     """Susun perintah subprocess main.py dari dict eksperimen.
 
     Args:
@@ -131,16 +125,21 @@ def build_command(experiment, save_dir):
     cmd = [sys.executable, str(PROJECT_ROOT / "main.py")]
     for flag, key in MAIN_FLAGS:
         value = experiment.get(key)
+
         if value is None:
             continue
+
         cmd.extend([flag, str(value)])
+
     cmd.extend(["--save-dir", str(save_dir), "--gradcam"])
+
     if experiment["denoise"]:
         cmd.append("--denoise")
+
     return cmd
 
 
-def run_experiment(experiment, out_root):
+def run_experiment(experiment: dict, out_root: Path) -> dict:
     """Jalankan satu eksperimen sebagai subprocess + kumpulkan hasilnya.
 
     Args:
@@ -155,10 +154,13 @@ def run_experiment(experiment, out_root):
     save_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_command(experiment, save_dir)
     log_path = save_dir / "stdout.log"
+
     proc = subprocess.run(
         cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False
     )
+
     log_path.write_text(proc.stdout + "\n\n===== STDERR =====\n" + proc.stderr)
+
     result = {
         "id": experiment["id"],
         "desc": experiment["desc"],
@@ -169,16 +171,19 @@ def run_experiment(experiment, out_root):
         "attention": experiment["attention"],
         "returncode": proc.returncode,
     }
+
     result.update(parse_metrics(proc.stdout))
     total_params, infer_ms = model_stats(experiment["attention"])
     result["total_params"] = total_params
     result["infer_ms_cpu"] = infer_ms
     status = "OK" if proc.returncode == 0 else "FAIL"
+
     print(f"[{status}] {experiment['id']}: {experiment['desc']}")
+
     return result
 
 
-def save_matrix_summary(out_root, rows):
+def save_matrix_summary(out_root: Path, rows: list) -> None:
     """Tulis matrix_summary.json: baris eksperimen + verdict + run summary.
 
     Args:
@@ -190,18 +195,21 @@ def save_matrix_summary(out_root, rows):
         summary_path = out_root / row["id"] / "run_summary.json"
         if summary_path.exists():
             summaries[row["id"]] = json.loads(summary_path.read_text())
+
     matrix = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "experiments": rows,
         "hypotheses": evaluate_hypotheses(rows),
         "run_summaries": summaries,
     }
+
     output_path = out_root / "matrix_summary.json"
     output_path.write_text(json.dumps(matrix, indent=2))
+
     print(f"Saved {output_path}")
 
 
-def main():
+def main() -> None:
     """Orkestrasi matriks: muat YAML, jalankan eksperimen, tulis CSV+JSON."""
     parser = argparse.ArgumentParser(description="Run PCD+ACM experiment matrix")
     parser.add_argument("--config", default="experiments/experiments.yml")
@@ -228,14 +236,17 @@ def main():
     if args.dry_run:
         for experiment in selected:
             print(f"[{experiment['id']}] {experiment['desc']}")
+
         return
 
     rows = [run_experiment(experiment, out_root) for experiment in selected]
     csv_path = out_root / "results.csv"
+
     with open(csv_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
+
     print(f"\nSaved {csv_path}")
     save_matrix_summary(out_root, rows)
 

@@ -19,7 +19,9 @@ Usage:
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 
@@ -29,8 +31,6 @@ import numpy as np
 from PIL import Image
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-
-import sys
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -42,7 +42,7 @@ CLASSES = ["infected", "noninfected"]
 SEG_METHODS = ["otsu", "adaptive"]
 
 
-def sample_images(data_dir, samples_per_class, seed=42):
+def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict:
     """Ambil sampel citra acak deterministik per kelas.
 
     Args:
@@ -55,17 +55,20 @@ def sample_images(data_dir, samples_per_class, seed=42):
     """
     rng = np.random.RandomState(seed)
     picked = {}
+
     for cls in CLASSES:
         files = sorted((PROJECT_ROOT / data_dir / cls).glob("*.jpg"))
+
         if len(files) <= samples_per_class:
             picked[cls] = files
         else:
             idx = rng.choice(len(files), samples_per_class, replace=False)
             picked[cls] = [files[i] for i in sorted(idx)]
+
     return picked
 
 
-def process_one(img_path):
+def process_one(img_path: Path) -> tuple:
     """Proses satu citra: denoise, enhance, metrik, dan statistik ROI.
 
     Args:
@@ -78,22 +81,32 @@ def process_one(img_path):
     raw = Image.open(img_path).convert("RGB")
     denoised = wavelet_denoise(raw)
     enhanced = enhance(denoised, "clahe")
-    row = {"file": img_path.name}
+
+    row: dict[str, Any] = {"file": img_path.name}
     row["psnr_denoise"] = psnr(raw, denoised)
     row["ssim_denoise"] = ssim(raw, denoised)
     row["psnr_enhanced"] = psnr(raw, enhanced)
     row["ssim_enhanced"] = ssim(raw, enhanced)
+
     for method in SEG_METHODS:
         mask = segment(enhanced, method=method)
         stats = analyze_regions(mask)
+
         row[f"{method}_regions"] = stats["num_regions"]
         row[f"{method}_coverage"] = round(stats["coverage"], 4)
         row[f"{method}_mean_area"] = round(stats["mean_area"], 1)
         row[f"{method}_max_area"] = round(stats["max_area"], 1)
+
     return row, raw, denoised, enhanced
 
 
-def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
+def save_figure(
+    raw: Image.Image,
+    denoised: Image.Image,
+    enhanced: Image.Image,
+    save_path: Path,
+    n_overlays: int = 1,
+) -> None:
     """Simpan figure 4 panel (asli, denoise, enhance, overlay Otsu).
 
     Args:
@@ -106,6 +119,7 @@ def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
     mask = segment(enhanced, method="otsu")
     overlay = overlay_mask(enhanced, mask)
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
+
     for ax, img, title in zip(
         axes,
         [raw, denoised, enhanced, overlay],
@@ -114,12 +128,13 @@ def save_figure(raw, denoised, enhanced, save_path, n_overlays=1):
         ax.imshow(img)
         ax.set_title(title, fontsize=11)
         ax.axis("off")
+
     plt.tight_layout()
     plt.savefig(save_path, dpi=120, bbox_inches="tight")
     plt.close(fig)
 
 
-def main():
+def main() -> None:
     """Orkestrasi evaluasi kualitas: sampling, proses, tulis CSV/JSON/figure."""
     parser = argparse.ArgumentParser(description="H1 quality evaluation (no training)")
     parser.add_argument("--data-dir", default="datasets")
@@ -137,14 +152,18 @@ def main():
 
     picked = sample_images(args.data_dir, args.samples_per_class, args.seed)
     rows = []
+
     for cls in CLASSES:
         for i, path in enumerate(picked[cls]):
             row, raw, denoised, enhanced = process_one(path)
             row["class"] = cls
             rows.append(row)
+
             if i < args.figures:
                 save_figure(raw, denoised, enhanced, fig_dir / f"{cls}_{i:02d}.png")
+
             print(f"[{cls} {i + 1}/{len(picked[cls])}] {path.name}")
+
     # Per-image CSV
     csv_path = out_root / "quality.csv"
     with open(csv_path, "w", newline="") as f:
@@ -155,22 +174,28 @@ def main():
     # Summary per class + overall (txt for humans, json for documentation)
     lines = []
     structured = {"samples_per_class": args.samples_per_class, "classes": {}}
+
     for cls in CLASSES + ["all"]:
         subset = [r for r in rows if cls == "all" or r["class"] == cls]
         lines.append(f"== {cls} (n={len(subset)}) ==")
         structured["classes"][cls] = {"n": len(subset), "metrics": {}}
+
         for key in rows[0]:
             if key in ("file", "class"):
                 continue
+
             s = summarize([r[key] for r in subset])
             lines.append(
                 f"  {key}: mean={s['mean']:.4f} std={s['std']:.4f} "
                 f"min={s['min']:.4f} max={s['max']:.4f}"
             )
+
             structured["classes"][cls]["metrics"][key] = s
+
     summary = "\n".join(lines)
     (out_root / "summary.txt").write_text(summary)
     (out_root / "summary.json").write_text(json.dumps(structured, indent=2))
+
     print("\n" + summary)
     print(f"\nSaved {csv_path}")
 

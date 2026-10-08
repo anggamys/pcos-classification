@@ -3,7 +3,7 @@
 import argparse
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Definisikan dan uraikan argumen baris perintah training.
 
     Returns:
@@ -107,7 +107,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def build_config(args):
+def build_config(args: argparse.Namespace) -> dict:
     """Susun dict config training dari argumen CLI.
 
     Args:

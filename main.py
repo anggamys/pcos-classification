@@ -1,6 +1,8 @@
-import torch
+import argparse
 from collections.abc import Sized
 from typing import cast
+
+import torch
 
 from src.cli import build_config, parse_args
 from src.dataset import create_dataloaders
@@ -12,12 +14,17 @@ from src.evaluate import (
     plot_training_history,
     print_report,
 )
+from src.gradcam import visualize_gradcam
 from src.models.densenet121 import DenseNet121Attention
 from src.run_summary import save_run_summary
 from src.train import train
 
 
-def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
+def get_model(
+    pretrained: bool = True,
+    dropout: float = 0.3,
+    attention_type: str = "self_attention",
+) -> DenseNet121Attention:
     """Bangun model DenseNet-121 + Attention sesuai judul kerja.
 
     Args:
@@ -29,14 +36,13 @@ def get_model(pretrained=True, dropout=0.3, attention_type="self_attention"):
         DenseNet121Attention: Model klasifikasi biner PCOS.
     """
     return DenseNet121Attention(
-        num_classes=1,
         pretrained=pretrained,
         dropout=dropout,
         attention_type=attention_type,
     )
 
 
-def print_config(config, args):
+def print_config(config: dict, args: argparse.Namespace) -> None:
     """Cetak ringkasan config dan identitas model ke terminal.
 
     Args:
@@ -44,25 +50,28 @@ def print_config(config, args):
         args (argparse.Namespace): Argumen CLI (model, attention, dropout).
     """
     print("Config:")
+
     for key, value in config.items():
         print(f"  {key}: {value}")
+
     print("  model: densenet121")
     print(f"  attention: {args.attention}")
     print(f"  dropout: {args.dropout}")
     print()
 
 
-def print_gpu_info():
+def print_gpu_info() -> None:
     """Cetak nama GPU dan VRAM bila CUDA tersedia; diam bila CPU."""
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         total_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
+
         print(f"GPU: {gpu_name}")
         print(f"VRAM: {total_mem:.1f} GB | AMP: enabled (float16)")
         print()
 
 
-def main():
+def main() -> None:
     """Orkestrasi satu run: data, model, training, evaluasi, dokumentasi."""
     args = parse_args()
     config = build_config(args)
@@ -71,6 +80,7 @@ def main():
     print_gpu_info()
 
     print("Loading dataset...")
+
     train_loader, val_loader, test_loader = create_dataloaders(
         root_dir=config["data_dir"],
         batch_size=config["batch_size"],
@@ -86,6 +96,7 @@ def main():
     print(f"Train: {len(cast(Sized, train_loader.dataset))}")
     print(f"Val:   {len(cast(Sized, val_loader.dataset))}")
     print(f"Test:  {len(cast(Sized, test_loader.dataset))}")
+
     dataset_sizes = {
         "train": len(cast(Sized, train_loader.dataset)),
         "val": len(cast(Sized, val_loader.dataset)),
@@ -95,22 +106,28 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print(f"\nInitializing densenet121 with {args.attention} attention...")
+
     model = get_model(
         pretrained=not args.no_pretrained,
         dropout=args.dropout,
         attention_type=args.attention,
     )
+
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
     print(f"Total params:     {total_params:,}")
     print(f"Trainable params: {trainable_params:,}")
+
     model_info = {"total_params": total_params, "trainable_params": trainable_params}
     print("\nStarting training...")
+
     history = train(model, train_loader, val_loader, config)
 
     plot_training_history(history, save_path=f"{args.save_dir}/training_history.png")
 
     print("\nLoading best model for evaluation...")
+
     checkpoint = torch.load(f"{args.save_dir}/best_model.pth", weights_only=True)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
@@ -133,6 +150,7 @@ def main():
         results["predictions"],
         save_path=f"{args.save_dir}/confusion_matrix.png",
     )
+
     plot_roc_curve(
         metrics["false_positive_rate"],
         metrics["true_positive_rate"],
@@ -142,7 +160,6 @@ def main():
 
     if args.gradcam:
         print("\nGenerating Grad-CAM visualization...")
-        from src.gradcam import visualize_gradcam
 
         visualize_gradcam(
             model,

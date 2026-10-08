@@ -1,5 +1,6 @@
 """Machine-readable run documentation (run_summary.json)."""
 
+import argparse
 import json
 import subprocess
 from datetime import datetime, timezone
@@ -26,7 +27,7 @@ SUMMARY_ARTIFACTS = [
 ]
 
 
-def get_git_commit():
+def get_git_commit() -> str:
     """Ambil hash commit git pendek untuk keterlacakan run.
 
     Returns:
@@ -47,8 +48,15 @@ def get_git_commit():
 
 
 def save_run_summary(
-    save_dir, args, config, dataset_sizes, model_info, history, test_metrics, device
-):
+    save_dir: str | Path,
+    args: argparse.Namespace,
+    config: dict,
+    dataset_sizes: dict,
+    model_info: dict,
+    history: dict,
+    test_metrics: dict,
+    device: torch.device,
+) -> None:
     """Tulis dokumentasi run machine-readable ke run_summary.json.
 
     Mencatat timestamp, commit git, environment, config, ukuran dataset,
@@ -68,9 +76,11 @@ def save_run_summary(
     checkpoint = torch.load(
         Path(save_dir) / "best_model.pth", map_location="cpu", weights_only=True
     )
+
     best_epoch = int(checkpoint.get("epoch", -1)) + 1
     stopped_epoch = len(history["train_loss"])
     artifacts = [name for name in SUMMARY_ARTIFACTS if (Path(save_dir) / name).exists()]
+
     summary = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "git_commit": get_git_commit(),
@@ -99,6 +109,8 @@ def save_run_summary(
         "test_metrics": {key: float(test_metrics[key]) for key in SUMMARY_METRICS},
         "artifacts": artifacts,
     }
+
     output_path = Path(save_dir) / "run_summary.json"
     output_path.write_text(json.dumps(summary, indent=2))
+
     print(f"\nRun summary saved to {output_path}")

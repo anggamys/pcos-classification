@@ -14,10 +14,13 @@ from sklearn.metrics import (
     roc_curve,
 )
 from torch.amp import autocast
+from torch.utils.data import DataLoader
 
 
 @torch.no_grad()
-def evaluate_model(model, loader, device):
+def evaluate_model(
+    model: torch.nn.Module, loader: DataLoader, device: torch.device
+) -> dict:
     """Inferensi seluruh loader dan kumpulkan probabilitas prediksi.
 
     Args:
@@ -35,8 +38,10 @@ def evaluate_model(model, loader, device):
 
     for images, labels in loader:
         images = images.to(device, non_blocking=True)
+
         with autocast(device_type=device.type, enabled=use_amp):
             outputs = model(images)
+
         probabilities = torch.sigmoid(outputs).cpu().numpy().flatten()
         all_probabilities.extend(probabilities)
         all_labels.extend(labels.numpy())
@@ -52,7 +57,7 @@ def evaluate_model(model, loader, device):
     }
 
 
-def compute_metrics(results):
+def compute_metrics(results: dict) -> dict:
     """Hitung metrik diagnostik dari hasil evaluasi.
 
     Args:
@@ -94,7 +99,9 @@ def compute_metrics(results):
     }
 
 
-def plot_confusion_matrix(labels, predictions, save_path=None):
+def plot_confusion_matrix(
+    labels: np.ndarray, predictions: np.ndarray, save_path: str | None = None
+) -> None:
     """Gambar confusion matrix beranotasi cacah per sel.
 
     Args:
@@ -113,6 +120,7 @@ def plot_confusion_matrix(labels, predictions, save_path=None):
                 if confusion_values[row, col] > confusion_values.max() / 2
                 else "black"
             )
+
             ax.text(
                 col,
                 row,
@@ -129,14 +137,22 @@ def plot_confusion_matrix(labels, predictions, save_path=None):
     ax.set_yticks([0, 1])
     ax.set_xticklabels(["Non-Infected", "Infected"])
     ax.set_yticklabels(["Non-Infected", "Infected"])
+
     plt.colorbar(im)
     plt.tight_layout()
+
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
     plt.show()
 
 
-def plot_roc_curve(false_positive_rate, true_positive_rate, auc_value, save_path=None):
+def plot_roc_curve(
+    false_positive_rate: np.ndarray,
+    true_positive_rate: np.ndarray,
+    auc_value: float,
+    save_path: str | None = None,
+) -> None:
     """Gambar kurva ROC beserta nilai AUC-nya.
 
     Args:
@@ -153,19 +169,28 @@ def plot_roc_curve(false_positive_rate, true_positive_rate, auc_value, save_path
         linewidth=2,
         label=f"AUC = {auc_value:.4f}",
     )
+
     ax.plot([0, 1], [0, 1], "k--", linewidth=1)
     ax.set_xlabel("False Positive Rate", fontsize=12)
     ax.set_ylabel("True Positive Rate", fontsize=12)
     ax.set_title("ROC Curve", fontsize=14)
     ax.legend(fontsize=12)
     ax.grid(True, alpha=0.3)
+
     plt.tight_layout()
+
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
     plt.show()
 
 
-def plot_pr_curve(precision_curve, recall_curve, average_precision, save_path=None):
+def plot_pr_curve(
+    precision_curve: np.ndarray,
+    recall_curve: np.ndarray,
+    average_precision: float,
+    save_path: str | None = None,
+) -> None:
     """Gambar kurva precision-recall beserta average precision-nya.
 
     Args:
@@ -182,18 +207,22 @@ def plot_pr_curve(precision_curve, recall_curve, average_precision, save_path=No
         linewidth=2,
         label=f"AP = {average_precision:.4f}",
     )
+
     ax.set_xlabel("Recall", fontsize=12)
     ax.set_ylabel("Precision", fontsize=12)
     ax.set_title("Precision-Recall Curve", fontsize=14)
     ax.legend(fontsize=12)
     ax.grid(True, alpha=0.3)
+
     plt.tight_layout()
+
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
     plt.show()
 
 
-def plot_training_history(history, save_path=None):
+def plot_training_history(history: dict, save_path: str | None = None) -> None:
     """Gambar kurva loss dan akurasi train vs validasi per epoch.
 
     Args:
@@ -219,12 +248,14 @@ def plot_training_history(history, save_path=None):
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
+
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
     plt.show()
 
 
-def print_report(results):
+def print_report(results: dict) -> None:
     """Cetak classification report sklearn ke terminal.
 
     Args:

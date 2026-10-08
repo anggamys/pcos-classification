@@ -5,6 +5,10 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
+from .preprocessing.quality import enhance
+from .preprocessing.segmentation import apply_masked, apply_roi_crop, segment
+from .preprocessing.wavelet import wavelet_denoise
+
 
 class PCOSDataset(Dataset):
     """Dataset citra USG ovarium (PCOS vs sehat) + preprocessing PCD.
@@ -22,13 +26,13 @@ class PCOSDataset(Dataset):
 
     def __init__(
         self,
-        root_dir,
+        root_dir: str | Path,
         transform=None,
-        denoise=False,
-        enhance="none",
-        segment="none",
-        input_mode="full",
-        seg_pad=8,
+        denoise: bool = False,
+        enhance: str = "none",
+        segment: str = "none",
+        input_mode: str = "full",
+        seg_pad: int = 8,
     ):
         self.root_dir = Path(root_dir)
         self.transform = transform
@@ -41,14 +45,15 @@ class PCOSDataset(Dataset):
 
         for label, subdir in enumerate(["noninfected", "infected"]):
             subdir_path = self.root_dir / subdir
+
             for img_name in sorted(subdir_path.glob("*.jpg")):
                 self.samples.append((str(img_name), label))
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Cacah seluruh sampel (infected + noninfected)."""
         return len(self.samples)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple:
         """Ambil satu sampel: preprocessing PCD lalu transform.
 
         Args:
@@ -61,22 +66,12 @@ class PCOSDataset(Dataset):
         image = Image.open(img_path).convert("RGB")
 
         if self.enhance != "none":
-            from .preprocessing.quality import enhance
-
             image = enhance(image, method=self.enhance)
 
         if self.denoise:
-            from .preprocessing.wavelet import wavelet_denoise
-
             image = wavelet_denoise(image)
 
         if self.input_mode in ("roi", "masked") or self.segment != "none":
-            from .preprocessing.segmentation import (
-                apply_masked,
-                apply_roi_crop,
-                segment,
-            )
-
             mask = segment(image, method=self.segment)
             if self.input_mode == "roi":
                 image = apply_roi_crop(image, mask, pad=self.seg_pad)
@@ -98,16 +93,16 @@ class TransformedSubset(Dataset):
         transform: Transform torchvision khusus subset ini.
     """
 
-    def __init__(self, dataset, indices, transform):
+    def __init__(self, dataset: Dataset, indices, transform) -> None:
         self.dataset = dataset
         self.indices = indices
         self.transform = transform
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Cacah sampel dalam subset."""
         return len(self.indices)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple:
         """Ambil sampel subset lalu terapkan transform.
 
         Args:
@@ -122,7 +117,7 @@ class TransformedSubset(Dataset):
         return img, label
 
 
-def get_transforms(train=True, image_size=224):
+def get_transforms(train: bool = True, image_size: int = 224) -> transforms.Compose:
     """Susun transform torchvision untuk train atau evaluasi.
 
     Train memakai augmentasi (rotasi, flip, crop acak); evaluasi hanya
@@ -157,18 +152,18 @@ def get_transforms(train=True, image_size=224):
 
 
 def create_dataloaders(
-    root_dir,
-    batch_size=32,
-    image_size=224,
-    train_ratio=0.7,
-    val_ratio=0.15,
-    denoise=False,
-    enhance="none",
-    segment="none",
-    input_mode="full",
-    seg_pad=8,
-    num_workers=4,
-):
+    root_dir: str | Path,
+    batch_size: int = 32,
+    image_size: int = 224,
+    train_ratio: float = 0.7,
+    val_ratio: float = 0.15,
+    denoise: bool = False,
+    enhance: str = "none",
+    segment: str = "none",
+    input_mode: str = "full",
+    seg_pad: int = 8,
+    num_workers: int = 4,
+) -> tuple[DataLoader, DataLoader, DataLoader]:
     """Bagi dataset (seed 42) dan bangun tiga DataLoader train/val/test.
 
     Args:

@@ -17,15 +17,30 @@ def enhance_clahe(
 
     Args:
         pil_image (PIL.Image.Image): Citra masukan.
-        tiles (int): Jumlah tile per sisi (default 8).
+        tiles (int): Jumlah tile per sisi (default 8). Harus >= 1 dan tidak
+            melebihi dimensi citra; tile terlalu kecil (beberapa piksel)
+            membuat histogram per-tile kolaps sehingga kontras jenuh ke 255.
         clip (float): Batas pemotongan histogram per tile (default 2.0).
 
     Returns:
         PIL.Image.Image: Citra RGB hasil enhancement, ukuran sama.
+
+    Raises:
+        ValueError: Jika tiles < 1 atau tiles melebihi dimensi citra.
     """
+    if tiles < 1:
+        raise ValueError(f"tiles harus >= 1, diterima {tiles}")
+
     gray = ImageOps.grayscale(pil_image)
     arr = np.array(gray).astype(np.float64)
     height, width = arr.shape
+
+    if tiles > min(height, width):
+        raise ValueError(
+            f"tiles={tiles} melebihi dimensi citra {width}x{height}; "
+            "kurangi jumlah tile agar histogram per-tile tetap bermakna"
+        )
+
     out = np.zeros_like(arr)
     tile_height, tile_width = max(height // tiles, 1), max(width // tiles, 1)
 
@@ -97,14 +112,19 @@ def psnr(img_a: Image.Image, img_b: Image.Image, max_val: float = 255.0) -> floa
 
     Returns:
         float: Nilai PSNR dalam dB; tak hingga bila kedua citra identik.
+
+    Raises:
+        ValueError: Jika kedua citra berukuran berbeda (tidak di-resize
+            diam-diam agar metrik tidak menyesatkan).
     """
     image_a = _to_gray_float(img_a)
     image_b = _to_gray_float(img_b)
 
     if image_a.shape != image_b.shape:
-        image_b = np.array(
-            ImageOps.grayscale(img_b).resize(image_a.shape[::-1])
-        ).astype(np.float64)
+        raise ValueError(
+            f"Ukuran citra berbeda: {image_a.shape} vs {image_b.shape}; "
+            "samakan ukuran dulu bila perbandingan memang dimaksudkan"
+        )
 
     mse = float(np.mean((image_a - image_b) ** 2))
 
@@ -130,14 +150,19 @@ def ssim(
 
     Returns:
         float: Skor SSIM pada rentang [-1, 1]; 1 berarti identik.
+
+    Raises:
+        ValueError: Jika kedua citra berukuran berbeda (tidak di-resize
+            diam-diam agar metrik tidak menyesatkan).
     """
     image_a = _to_gray_float(img_a)
     image_b = _to_gray_float(img_b)
 
     if image_a.shape != image_b.shape:
-        image_b = np.array(
-            ImageOps.grayscale(img_b).resize(image_a.shape[::-1])
-        ).astype(np.float64)
+        raise ValueError(
+            f"Ukuran citra berbeda: {image_a.shape} vs {image_b.shape}; "
+            "samakan ukuran dulu bila perbandingan memang dimaksudkan"
+        )
 
     c1, c2 = (0.01 * max_val) ** 2, (0.03 * max_val) ** 2
 

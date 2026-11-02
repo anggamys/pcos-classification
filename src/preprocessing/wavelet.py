@@ -9,8 +9,9 @@ def bayes_shrink_denoise(
 ) -> np.ndarray:
     """Denoising kanal tunggal dengan threshold adaptif BayesShrink.
 
-    Noise diestimasi dari median koefisien detail terhalus, lalu tiap
-    koefisien detail di-soft-threshold secara adaptif sebelum rekonstruksi.
+    Noise diestimasi dari median koefisien detail diagonal terhalus (HH1)
+    sesuai Chang-Yu-Vetterli, lalu tiap koefisien detail di-soft-threshold
+    secara adaptif sebelum rekonstruksi.
 
     Args:
         channel (numpy.ndarray): Array 2D satu kanal citra, rentang [0, 1].
@@ -20,8 +21,9 @@ def bayes_shrink_denoise(
     Returns:
         numpy.ndarray: Array 2D hasil denoise, bentuk sama dengan masukan.
     """
+    height, width = channel.shape
     coeffs = pywt.wavedec2(channel, wavelet, level=level)
-    sigma = np.median(np.abs(coeffs[-1][0])) / 0.6745
+    sigma = np.median(np.abs(coeffs[-1][2])) / 0.6745
 
     denoised_coeffs = [coeffs[0]]
     for detail_level in coeffs[1:]:
@@ -36,7 +38,10 @@ def bayes_shrink_denoise(
 
         denoised_coeffs.append(denoised_detail)
 
-    return pywt.waverec2(denoised_coeffs, wavelet)
+    # waverec2 bisa mengembalikan ukuran +1 pada dimensi ganjil; crop
+    # kembali ke bentuk masukan agar citra tidak bergeser ukuran.
+    reconstructed = pywt.waverec2(denoised_coeffs, wavelet)
+    return reconstructed[:height, :width]
 
 
 def wavelet_denoise(pil_image: Image.Image) -> Image.Image:
@@ -61,7 +66,9 @@ def wavelet_denoise(pil_image: Image.Image) -> Image.Image:
     else:
         denoised = np.clip(bayes_shrink_denoise(img), 0, 1)
 
-    denoised = (denoised * 255).astype(np.uint8)
+    denoised = np.multiply(
+        np.asarray(denoised, dtype=np.float64), 255.0, dtype=np.float64
+    ).astype(np.uint8)
 
     return Image.fromarray(denoised)
 

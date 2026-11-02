@@ -416,12 +416,21 @@ def overlay_mask(
 
     Returns:
         PIL.Image.Image: Citra RGB dengan overlay mask.
+
+    Raises:
+        ValueError: Jika ukuran mask tidak sama dengan ukuran citra.
     """
     base = pil_image.convert("RGBA")
+    mask_array = np.asarray(mask, dtype=bool)
+
+    if mask_array.shape != (base.height, base.width):
+        raise ValueError(
+            f"Ukuran mask {mask_array.shape} tidak sama dengan ukuran citra "
+            f"{(base.height, base.width)}"
+        )
+
     overlay = Image.new("RGBA", base.size, color + (0,))
-    alpha_layer = Image.fromarray(
-        (np.asarray(mask, dtype=bool) * alpha).astype(np.uint8)
-    )
+    alpha_layer = Image.fromarray((mask_array * alpha).astype(np.uint8))
 
     overlay.putalpha(alpha_layer)
 

@@ -48,12 +48,31 @@ class GradCAM:
 
         Returns:
             numpy.ndarray: Heatmap 2D seukuran citra masukan.
+
+        Raises:
+            ValueError: Jika masukan bukan tepat satu citra, atau
+                target_class di luar rentang keluaran model (model biner
+                satu-logit: hanya 0 yang valid).
         """
+        if input_tensor.dim() != 4 or input_tensor.size(0) != 1:
+            raise ValueError(
+                "Grad-CAM butuh tepat satu citra (1, C, H, W); "
+                f"diterima bentuk {tuple(input_tensor.shape)}"
+            )
+
         self.model.eval()
         output = self.model(input_tensor)
 
         if target_class is None:
             target_class = output.argmax(dim=1).item()
+
+        assert target_class is not None
+        if not 0 <= target_class < output.shape[1]:
+            raise ValueError(
+                f"target_class={target_class} di luar rentang keluaran model "
+                f"(model menghasilkan {output.shape[1]} nilai; model biner "
+                "satu-logit hanya valid untuk 0)"
+            )
 
         self.model.zero_grad()
         output[0, target_class].backward()
@@ -219,6 +238,13 @@ def visualize_gradcam(
 
         if count >= num_samples:
             break
+
+    if count == 0:
+        plt.close()
+        raise RuntimeError(
+            "Dataloader kosong: tidak ada sampel untuk divisualisasi; "
+            "figure tidak disimpan."
+        )
 
     plt.tight_layout()
     plt.savefig(f"{save_dir}/gradcam_visualization.png", dpi=150, bbox_inches="tight")

@@ -1,7 +1,11 @@
 import argparse
+import random
+import sys
 from collections.abc import Sized
+from pathlib import Path
 from typing import cast
 
+import numpy as np
 import torch
 
 from src.cli import build_config, parse_args
@@ -18,6 +22,40 @@ from src.gradcam import visualize_gradcam
 from src.models.densenet121 import DenseNet121Attention
 from src.run_summary import save_run_summary
 from src.train import train
+
+
+class _Tee:
+    """Duplikasi tulisan sys.stdout/sys.stderr ke file log training.
+
+    Args:
+        *streams: Stream tujuan (terminal + file log).
+    """
+
+    def __init__(self, *streams) -> None:
+        self.streams = streams
+
+    def write(self, data: str) -> int:
+        for stream in self.streams:
+            stream.write(data)
+
+        return len(data)
+
+    def flush(self) -> None:
+        for stream in self.streams:
+            stream.flush()
+
+
+def set_seed(seed: int) -> None:
+    """Set seed global agar split, shuffle, augmentasi, dan inisialisasi
+    model reprodusibel.
+
+    Args:
+        seed (int): Nilai seed untuk random, numpy, dan torch (CPU+CUDA).
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def get_model(
@@ -72,9 +110,37 @@ def print_gpu_info() -> None:
 
 
 def main() -> None:
-    """Orkestrasi satu run: data, model, training, evaluasi, dokumentasi."""
+    """Orkestrasi satu run: data, model, training, evaluasi, dokumentasi.
+
+    Seluruh keluaran konsol (termasuk progress bar) di-tee ke
+    `<save_dir>/training.log` untuk dokumentasi run langsung; saat dijalankan
+    via run_matrix, stdout/stderr juga terekam penuh di `<save_dir>/stdout.log`.
+    """
     args = parse_args()
     config = build_config(args)
+
+    Path(args.save_dir).mkdir(parents=True, exist_ok=True)
+    log_file = open(Path(args.save_dir) / "training.log", "a", encoding="utf-8")
+    original_stdout, original_stderr = sys.stdout, sys.stderr
+    sys.stdout = _Tee(sys.stdout, log_file)
+    sys.stderr = _Tee(sys.stderr, log_file)
+
+    try:
+        _run_pipeline(args, config)
+    finally:
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        log_file.close()
+
+
+def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
+    """Alur utama satu run: seed, data, model, training, evaluasi, ringkasan.
+
+    Args:
+        args (argparse.Namespace): Argumen CLI hasil parse_args.
+        config (dict): Config training hasil build_config.
+    """
+    set_seed(args.seed)
 
     print_config(config, args)
     print_gpu_info()
@@ -91,6 +157,8 @@ def main() -> None:
         input_mode=config["input_mode"],
         seg_pad=config["seg_pad"],
         num_workers=args.num_workers,
+        dedupe=not args.no_dedupe,
+        seed=args.seed,
     )
 
     print(f"Train: {len(cast(Sized, train_loader.dataset))}")
@@ -102,6 +170,12 @@ def main() -> None:
         "val": len(cast(Sized, val_loader.dataset)),
         "test": len(cast(Sized, test_loader.dataset)),
     }
+
+    source_dataset = getattr(train_loader.dataset, "dataset", train_loader.dataset)
+    dedup_stats = getattr(source_dataset, "dedup_stats", None)
+
+    if dedup_stats:
+        dataset_sizes["duplicates_removed"] = dedup_stats["removed"]
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

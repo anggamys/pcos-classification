@@ -1,12 +1,14 @@
 """Machine-readable run documentation (run_summary.json)."""
 
 import argparse
+import datetime
 import json
 import subprocess
-from datetime import datetime, timezone
+import sys
 from pathlib import Path
 
 import torch
+import torchvision
 
 SUMMARY_METRICS = (
     "accuracy",
@@ -20,6 +22,7 @@ SUMMARY_METRICS = (
 
 SUMMARY_ARTIFACTS = [
     "best_model.pth",
+    "training.log",
     "training_history.png",
     "confusion_matrix.png",
     "roc_curve.png",
@@ -79,19 +82,26 @@ def save_run_summary(
 
     best_epoch = int(checkpoint.get("epoch", -1)) + 1
     stopped_epoch = len(history["train_loss"])
+    pos_weight = checkpoint.get("pos_weight")
     artifacts = [name for name in SUMMARY_ARTIFACTS if (Path(save_dir) / name).exists()]
 
     summary = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         "git_commit": get_git_commit(),
         "environment": {
             "device": device.type,
             "gpu_name": torch.cuda.get_device_name(0)
             if device.type == "cuda"
             else None,
+            "python_version": sys.version.split()[0],
             "torch_version": torch.__version__,
+            "torchvision_version": torchvision.__version__,
         },
         "config": config,
+        "loss": {
+            "type": "BCEWithLogitsLoss",
+            "pos_weight": None if pos_weight is None else float(pos_weight),
+        },
         "model": {
             "name": "densenet121",
             "attention": args.attention,

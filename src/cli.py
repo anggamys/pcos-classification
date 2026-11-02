@@ -83,6 +83,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--num-workers", type=int, default=2, help="DataLoader num_workers (default: 2)"
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed split, shuffle, augmentasi, dan inisialisasi model (default: 42)",
+    )
+    parser.add_argument(
+        "--no-dedupe",
+        action="store_true",
+        help="Nonaktifkan pembuangan salinan byte-identik (md5) sebelum split",
+    )
+    parser.add_argument(
+        "--no-pos-weight",
+        action="store_true",
+        help="Nonaktifkan pos_weight BCE (default: aktif, rasio "
+        "n_negatif/n_positif split train untuk ketimpangan kelas pasca-dedup)",
+    )
 
     parser.add_argument(
         "--attention",
@@ -131,4 +148,10 @@ def build_config(args: argparse.Namespace) -> dict:
         "segment": args.segment,
         "input_mode": args.input_mode,
         "seg_pad": args.seg_pad,
+        "seed": args.seed,
+        "dedupe": not args.no_dedupe,
+        "pos_weight": not args.no_pos_weight,
+        "num_workers": args.num_workers,
+        "gradcam": args.gradcam,
+        "gradcam_samples": args.gradcam_samples,
     }

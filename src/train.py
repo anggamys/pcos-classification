@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from typing import Any
 
 import torch
 from torch import nn
@@ -8,6 +9,51 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+
+def compute_pos_weight(loader: DataLoader) -> float:
+    """Hitung pos_weight BCE dari label subset train (n_negatif/n_positif).
+
+    Label 1 (infected) mayoritas pasca-dedup (sekitar 4:1); pos_weight < 1
+    menurunkan kontribusi gradien kelas mayoritas sehingga kedua kelas
+    seimbang tanpa resampling. Dihitung hanya dari split train agar tidak
+    ada kebocoran informasi val/test.
+
+    Args:
+        loader (DataLoader): DataLoader training (TransformedSubset, dataset
+            dengan .samples, TensorDataset, atau dataset iterable label 0/1).
+
+    Returns:
+        float: pos_weight untuk nn.BCEWithLogitsLoss.
+
+    Raises:
+        ValueError: Jika subset train hanya memuat satu kelas.
+    """
+    dataset = loader.dataset
+    base: Any = getattr(dataset, "dataset", dataset)
+    indices = getattr(dataset, "indices", None)
+
+    if hasattr(base, "samples"):
+        if indices is None:
+            labels = [label for _, label in base.samples]
+        else:
+            labels = [base.samples[index][1] for index in indices]
+    elif hasattr(base, "tensors"):
+        labels = base.tensors[1].tolist()
+    else:
+        labels = [int(label) for _, label in base]
+
+    positive = int(sum(labels))
+    negative = len(labels) - positive
+
+    if positive == 0 or negative == 0:
+        raise ValueError(
+            f"Subset train satu kelas (positif={positive}, "
+            f"negatif={negative}); pos_weight tak terdefinisi dan training "
+            "tidak bermakna."
+        )
+
+    return negative / positive
 
 
 def train_one_epoch(
@@ -130,7 +176,22 @@ def train(
     use_amp = device.type == "cuda"
     scaler = GradScaler(enabled=use_amp)
 
-    criterion = nn.BCEWithLogitsLoss()
+    # Loss berbobot untuk ketimpangan kelas pasca-dedup (pos_weight = ratio
+    # n_negatif/n_positif SPLIT TRAIN, tanpa kebocoran val/test). Nilai yang
+    # benar-benar dipakai ikut tersimpan di checkpoint dan run_summary.json.
+    if config.get("pos_weight", True):
+        pos_weight_value = compute_pos_weight(train_loader)
+        criterion = nn.BCEWithLogitsLoss(
+            pos_weight=torch.tensor([pos_weight_value], dtype=torch.float32)
+        )
+        print(
+            f"Loss: BCEWithLogitsLoss + pos_weight={pos_weight_value:.4f} "
+            "(rasio n_negatif/n_positif split train)"
+        )
+    else:
+        pos_weight_value = None
+        criterion = nn.BCEWithLogitsLoss()
+        print("Loss: BCEWithLogitsLoss (tanpa pos_weight)")
 
     optimizer = Adam(
         model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]
@@ -155,8 +216,6 @@ def train(
     print(
         f"Epochs: {config['epochs']}, LR: {config['lr']}, Batch: {config['batch_size']}"
     )
-
-    print("-" * 60)
 
     for epoch in range(config["epochs"]):
         start = time.time()
@@ -193,6 +252,7 @@ def train(
                     "optimizer_state_dict": optimizer.state_dict(),
                     "val_loss": val_loss,
                     "val_acc": val_acc,
+                    "pos_weight": pos_weight_value,
                 },
                 save_dir / "best_model.pth",
             )

@@ -18,6 +18,7 @@ Usage:
 
 import argparse
 import csv
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -45,6 +46,10 @@ SEG_METHODS = ["otsu", "adaptive"]
 def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict:
     """Ambil sampel citra acak deterministik per kelas.
 
+    Salinan byte-identik (md5, keep-first) dibuang sebelum sampling agar
+    statistik PSNR/SSIM tidak didominasi salinan duplikat, konsisten
+    dengan dedup di PCOSDataset.
+
     Args:
         data_dir (str): Direktori dataset (berisi infected/noninfected).
         samples_per_class (int): Jumlah sampel per kelas.
@@ -59,11 +64,21 @@ def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict
     for cls in CLASSES:
         files = sorted((PROJECT_ROOT / data_dir / cls).glob("*.jpg"))
 
-        if len(files) <= samples_per_class:
-            picked[cls] = files
+        seen = set()
+        unique = []
+
+        for file_path in files:
+            digest = hashlib.md5(file_path.read_bytes()).hexdigest()
+
+            if digest not in seen:
+                seen.add(digest)
+                unique.append(file_path)
+
+        if len(unique) <= samples_per_class:
+            picked[cls] = unique
         else:
-            idx = rng.choice(len(files), samples_per_class, replace=False)
-            picked[cls] = [files[i] for i in sorted(idx)]
+            idx = rng.choice(len(unique), samples_per_class, replace=False)
+            picked[cls] = [unique[i] for i in sorted(idx)]
 
     return picked
 

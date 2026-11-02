@@ -74,7 +74,8 @@ def resolve_overrides(args: argparse.Namespace, experiments: list) -> list:
     overrides = {
         key: value
         for key, value in vars(args).items()
-        if key in ("data_dir", "epochs", "batch_size", "gradcam_samples", "out_dir")
+        if key
+        in ("data_dir", "epochs", "batch_size", "seed", "gradcam_samples", "out_dir")
         and value is not None
     }
 

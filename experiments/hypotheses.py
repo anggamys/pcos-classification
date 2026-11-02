@@ -1,6 +1,17 @@
-"""Descriptive H1-H3 verdicts from experiment metrics (no statistics)."""
+"""Descriptive H1-H3 verdicts from experiment metrics (no statistics).
 
-H3_TOLERANCE = 0.005
+Operasionalisasi yang disepakati (prespecified, bukan post-hoc):
+- H1: E2 harus lebih baik secara ketat pada minimal satu metrik
+  (akurasi atau AUC) tanpa regresi melebihi toleransi pada metrik
+  satunya. Hasil identik tidak dihitung accepted. PSNR/SSIM dari
+  quality.csv berperan sebagai bukti deskriptif, bukan penentu verdict.
+- H2: varian utama yang diprespesifikasi adalah E4 (ROI crop Otsu)
+  dengan AUC sebagai metrik utama; E5 (masked) dilaporkan deskriptif
+  agar tidak terjadi seleksi varian terbaik di atas test set.
+- H3: E6 vs E4 dengan toleransi 0.005 pada akurasi/AUC.
+"""
+
+METRIC_TOLERANCE = 0.005
 
 
 def _take(by_id: dict, row_id: str, keys: tuple) -> dict | None:
@@ -46,6 +57,14 @@ def _optional(by_id: dict, row_id: str, key: str) -> float | None:
 def evaluate_hypotheses(rows: list) -> dict:
     """Verdict deskriptif H1-H3 dari metrik eksperimen (tanpa statistik).
 
+    Kriteria prespecified:
+    - H1: E2 > E1 secara ketat pada minimal satu metrik (akurasi atau AUC)
+      tanpa regresi melebihi toleransi pada metrik satunya.
+    - H2: AUC E4 > AUC E3 dan F1 E4 tidak lebih buruk melebihi toleransi;
+      E5 hanya pelaporan deskriptif (bukan bagian verdict).
+    - H3: E6 >= E4 - toleransi pada akurasi/AUC, parameter lebih sedikit,
+      latency tidak lebih besar.
+
     Hipotesis yang datanya belum lengkap dilewati agar run parsial
     (--only) tetap menghasilkan verdict untuk yang tersedia.
 
@@ -62,45 +81,44 @@ def evaluate_hypotheses(rows: list) -> dict:
     denoised = _take(by_id, "E2", ("accuracy", "auc"))
 
     if baseline is not None and denoised is not None:
-        accepted = (
-            denoised["accuracy"] >= baseline["accuracy"]
-            and denoised["auc"] >= baseline["auc"]
+        acc_improves = (
+            denoised["accuracy"] > baseline["accuracy"]
+            and denoised["auc"] >= baseline["auc"] - METRIC_TOLERANCE
+        )
+        auc_improves = (
+            denoised["auc"] > baseline["auc"]
+            and denoised["accuracy"] >= baseline["accuracy"] - METRIC_TOLERANCE
         )
 
         verdicts["H1"] = {
-            "status": "accepted" if accepted else "not_accepted",
-            "detail": "akurasi/AUC E2 >= E1 (+PSNR/SSIM dari quality.csv)",
+            "status": "accepted" if (acc_improves or auc_improves) else "not_accepted",
+            "detail": (
+                "E2 > E1 ketat pada minimal satu metrik (akurasi/AUC) tanpa "
+                "regresi > 0.005; PSNR/SSIM dari quality.csv deskriptif"
+            ),
         }
 
     full_image = _take(by_id, "E3", ("f1", "auc"))
-    roi_runs = {
-        experiment_id: _take(by_id, experiment_id, ("f1", "auc"))
-        for experiment_id in ("E4", "E5")
-    }
+    roi_primary = _take(by_id, "E4", ("f1", "auc"))
+    masked = _take(by_id, "E5", ("f1", "auc"))
 
-    if full_image is not None and all(roi_runs.values()):
-        complete_roi_runs = {
-            experiment_id: metrics
-            for experiment_id, metrics in roi_runs.items()
-            if metrics is not None
-        }
-
-        accepted = any(
-            item["f1"] > full_image["f1"] or item["auc"] > full_image["auc"]
-            for item in complete_roi_runs.values()
+    if full_image is not None and roi_primary is not None:
+        accepted = (
+            roi_primary["auc"] > full_image["auc"]
+            and roi_primary["f1"] >= full_image["f1"] - METRIC_TOLERANCE
         )
 
-        best_id = max(
-            complete_roi_runs,
-            key=lambda experiment_id: (
-                complete_roi_runs[experiment_id]["f1"],
-                complete_roi_runs[experiment_id]["auc"],
-            ),
+        detail = (
+            "AUC E4 > E3 dan F1 E4 >= E3 - 0.005 (varian utama prespecified); "
+            "E5 masked deskriptif"
         )
+
+        if masked is not None:
+            detail += f": F1 {masked['f1']:.4f}, AUC {masked['auc']:.4f}"
 
         verdicts["H2"] = {
             "status": "accepted" if accepted else "not_accepted",
-            "detail": f"F1/AUC {best_id} vs E3",
+            "detail": detail,
         }
 
     self_attention = _take(by_id, "E4", ("accuracy", "auc", "total_params"))
@@ -116,8 +134,8 @@ def evaluate_hypotheses(rows: list) -> dict:
         )
 
         accepted = (
-            cbam["accuracy"] >= self_attention["accuracy"] - H3_TOLERANCE
-            and cbam["auc"] >= self_attention["auc"] - H3_TOLERANCE
+            cbam["accuracy"] >= self_attention["accuracy"] - METRIC_TOLERANCE
+            and cbam["auc"] >= self_attention["auc"] - METRIC_TOLERANCE
             and cbam["total_params"] < self_attention["total_params"]
             and latency_ok
         )

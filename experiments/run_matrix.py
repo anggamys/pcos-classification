@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import torch
@@ -51,6 +51,7 @@ MAIN_FLAGS = [
     ("--dropout", "dropout"),
     ("--seg-pad", "seg_pad"),
     ("--num-workers", "num_workers"),
+    ("--seed", "seed"),
     ("--attention", "attention"),
     ("--enhance", "enhance"),
     ("--segment", "segment"),
@@ -136,6 +137,9 @@ def build_command(experiment: dict, save_dir: Path) -> list:
     if experiment["denoise"]:
         cmd.append("--denoise")
 
+    if not experiment.get("pos_weight", True):
+        cmd.append("--no-pos-weight")
+
     return cmd
 
 
@@ -169,6 +173,7 @@ def run_experiment(experiment: dict, out_root: Path) -> dict:
         "segment": experiment["segment"],
         "input_mode": experiment["input_mode"],
         "attention": experiment["attention"],
+        "pos_weight": experiment.get("pos_weight", True),
         "returncode": proc.returncode,
     }
 
@@ -197,7 +202,7 @@ def save_matrix_summary(out_root: Path, rows: list) -> None:
             summaries[row["id"]] = json.loads(summary_path.read_text())
 
     matrix = {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "experiments": rows,
         "hypotheses": evaluate_hypotheses(rows),
         "run_summaries": summaries,
@@ -216,6 +221,7 @@ def main() -> None:
     parser.add_argument("--data-dir", default=None)
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--batch-size", type=int, default=None)
+    parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--gradcam-samples", type=int, default=None)
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--only", default="", help="Comma-separated subset, e.g. E1,E2")

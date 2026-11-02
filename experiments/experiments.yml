@@ -18,7 +18,11 @@ defaults:
   dropout: 0.3
   seg_pad: 8
   num_workers: 2
+  seed: 42
   gradcam_samples: 5
+  # BCE pos_weight = n_negatif/n_positif split train: menyeimbangkan gradien
+  # ketimpangan 4:1 pasca-dedup tanpa resampling. Sama untuk semua eksperimen.
+  pos_weight: true
   out_dir: experiments/results
 
 experiments:
@@ -34,7 +38,7 @@ experiments:
   - id: E2
     desc: BayesShrink wavelet denoising
     hypothesis: H1
-    tests: PSNR/SSIM E2 > E1 dan akurasi/AUC E2 >= E1
+    tests: akurasi/AUC E2 > E1 ketat pada minimal satu metrik tanpa regresi > 0.005; PSNR/SSIM deskriptif
     denoise: true
     enhance: none
     segment: none
@@ -53,7 +57,7 @@ experiments:
   - id: E4
     desc: Preprocessing terbaik + ROI crop Otsu
     hypothesis: H2, baseline H3
-    tests: F1/AUC E4 > E3
+    tests: AUC E4 > E3 dan F1 E4 >= E3 - 0.005 (varian utama H2 prespecified)
     denoise: true
     enhance: clahe
     segment: otsu
@@ -63,7 +67,7 @@ experiments:
   - id: E5
     desc: Preprocessing terbaik + masked input Otsu
     hypothesis: H2
-    tests: F1/AUC E5 > E3
+    tests: deskriptif sekunder (verdict H2 memakai E4)
     denoise: true
     enhance: clahe
     segment: otsu

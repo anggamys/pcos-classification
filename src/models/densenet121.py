@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import nn
 from torchvision.models import DenseNet121_Weights, densenet121
@@ -7,6 +9,10 @@ from .attention import CBAMAttention, SEAttention, SelfAttention, TransformerAtt
 
 class DenseNet121Attention(nn.Module):
     """DenseNet-121 pretrained + modul attention + classifier biner PCOS.
+
+    Attention dijalankan pada peta fitur 2D sebelum pooling: SE/CBAM pada
+    (B, C, H, W); self-attention/transformer pada token spasial (B, H*W, C)
+    dengan N = H*W agar attention membawa informasi lokasi.
 
     Args:
         pretrained (bool): Muat bobot ImageNet bila True.
@@ -27,6 +33,10 @@ class DenseNet121Attention(nn.Module):
         self.backbone = densenet121(weights=weights)
 
         feature_dim = self.backbone.classifier.in_features
+        # Head ImageNet (Linear 1024 -> 1000) tidak dipakai; diganti Identity
+        # agar tidak menghitung 1.025 juta dead params di total_params.
+        # Replace the ImageNet head with an identity module at runtime.
+        self.backbone.classifier = cast(nn.Linear, nn.Identity())
 
         self.attention_type = attention_type
 
@@ -62,7 +72,7 @@ class DenseNet121Attention(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward: ekstraksi fitur, attention, lalu logit biner.
+        """Forward: ekstraksi fitur, ReLU, attention, pooling, logit biner.
 
         Args:
             x (torch.Tensor): Batch citra (B, 3, H, W).
@@ -71,19 +81,19 @@ class DenseNet121Attention(nn.Module):
             torch.Tensor: Logit biner bentuk (B, 1).
         """
         features = self.backbone.features(x)
+        # Selaras jalur asli torchvision: norm5 diikuti ReLU sebelum pooling.
+        features = torch.nn.functional.relu(features, inplace=True)
 
         if self.use_2d:
             features = self.attention(features)
-            features = torch.nn.functional.adaptive_avg_pool2d(features, 1)
-            features = features.view(features.size(0), -1)
-
         else:
-            features = torch.nn.functional.adaptive_avg_pool2d(features, 1)
-            features = features.view(features.size(0), -1)
+            batch, channels, height, width = features.shape
+            tokens = features.flatten(2).transpose(1, 2)  # (B, H*W, C)
+            tokens = self.attention(tokens)
+            features = tokens.transpose(1, 2).reshape(batch, channels, height, width)
 
-            features = features.unsqueeze(1)
-            features = self.attention(features)
-            features = features.squeeze(1)
+        features = torch.nn.functional.adaptive_avg_pool2d(features, 1)
+        features = features.view(features.size(0), -1)
 
         out = self.classifier(features)
 

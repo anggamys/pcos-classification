@@ -5,6 +5,10 @@ from torch import nn
 class SelfAttention(nn.Module):
     """Multi-head self-attention ala Artikel 1 (Q, K, V + proyeksi + norm).
 
+    Blok standar dengan residual: norm(x + proj(attention(x))). Wajib
+    dijalankan pada sekuens token spasial (N = H*W), bukan satu token,
+    agar attention membawa informasi lokasi.
+
     Args:
         embed_dim (int): Dimensi embedding fitur.
         num_heads (int): Jumlah attention head (default 8).
@@ -28,8 +32,20 @@ class SelfAttention(nn.Module):
 
         Returns:
             torch.Tensor: Fitur berbobot attention, bentuk sama.
+
+        Raises:
+            ValueError: Jika N < 2 (attention satu token degenerasi:
+                bobot softmax selalu 1 dan Q/K tidak pernah terlatih).
         """
         B, N, C = x.shape
+
+        if N < 2:
+            raise ValueError(
+                f"Self-attention pada N={N} token degenerasi (bobot softmax "
+                "selalu 1, Q/K tak terlatih). Pastikan peta fitur punya "
+                "minimal 2 token spasial (N = H*W); input citra kemungkinan "
+                "terlalu kecil."
+            )
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim)
         qkv = qkv.permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)
@@ -37,9 +53,8 @@ class SelfAttention(nn.Module):
         attn_scores = (q @ k.transpose(-2, -1)) * self.scale
         attn_scores = attn_scores.softmax(dim=-1)
 
-        x = (attn_scores @ v).transpose(1, 2).reshape(B, N, C)
-        x = self.proj(x)
-        x = self.norm(x)
+        attended = (attn_scores @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.norm(x + self.proj(attended))
         return x
 
 
@@ -220,7 +235,18 @@ class TransformerAttention(nn.Module):
 
         Returns:
             torch.Tensor: Token hasil encoding, bentuk sama.
+
+        Raises:
+            ValueError: Jika N < 2 (attention satu token degenerasi).
         """
+        if x.shape[1] < 2:
+            raise ValueError(
+                f"Transformer attention pada N={x.shape[1]} token degenerasi "
+                "(bobot attention selalu 1). Pastikan peta fitur punya "
+                "minimal 2 token spasial (N = H*W); input citra kemungkinan "
+                "terlalu kecil."
+            )
+
         x = self.transformer(x)
         x = self.norm(x)
 

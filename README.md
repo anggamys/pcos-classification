@@ -6,9 +6,9 @@ Topik ini dipakai untuk **dua tugas akhir matakuliah sekaligus**: Pengolahan Cit
 
 ## Referensi
 
-1. Tiwari, S., Shukla, A., & Sharma, A.K. (2026). *Attention-guided lightweight deep learning architecture for classification of polycystic ovary syndrome from ultrasound images.* Intelligence-Based Medicine, 13, 100358. DOI: [10.1016/j.ibmed.2026.100358](https://doi.org/10.1016/j.ibmed.2026.100358)
+1. Tiwari, S., Shukla, A., & Sharma, A.K. (2026). _Attention-guided lightweight deep learning architecture for classification of polycystic ovary syndrome from ultrasound images._ Intelligence-Based Medicine, 13, 100358. DOI: [10.1016/j.ibmed.2026.100358](https://doi.org/10.1016/j.ibmed.2026.100358)
 
-2. Sundari, M.S., et al. (2025). *Transfer Learning-Enhanced CNN Model for Integrative Ultrasound and Biomarker-Based Diagnosis of Polycystic Ovarian Disease.* Scientific Reports, 15:34519. DOI: [10.1038/s41598-025-17711-w](https://doi.org/10.1038/s41598-025-17711-w)
+2. Sundari, M.S., et al. (2025). _Transfer Learning-Enhanced CNN Model for Integrative Ultrasound and Biomarker-Based Diagnosis of Polycystic Ovarian Disease._ Scientific Reports, 15:34519. DOI: [10.1038/s41598-025-17711-w](https://doi.org/10.1038/s41598-025-17711-w)
 
 ## Konteks penelitian
 
@@ -53,17 +53,19 @@ pcos-classification/
 
 ### Attention Mechanisms (Perbandingan)
 
-| Mekanisme | Parameters | Prinsip Kerja |
-|-----------|------------|---------------|
-| **Self-Attention** | 11.4M | Q, K, V multi-head (Artikel 1) |
-| **SE-Net** | 7.3M | Channel-wise attention |
-| **CBAM** | 7.3M | Channel + Spatial attention |
-| **Transformer** | 32.4M | Patch-based attention |
+| Mekanisme          | Parameters | Prinsip Kerja                  |
+| ------------------ | ---------- | ------------------------------ |
+| **Self-Attention** | 11.4M      | Q, K, V multi-head (Artikel 1) |
+| **SE-Net**         | 7.3M       | Channel-wise attention         |
+| **CBAM**           | 7.3M       | Channel + Spatial attention    |
+| **Transformer**    | 32.4M      | Patch-based attention          |
 
 ### Model Arsitektur
+
 - **DenseNet-121 + Attention** - Backbone utama (11.4M params dengan self-attention)
 
 ### Advanced Features
+
 - **Grad-CAM** - Visual heatmap untuk interpretasi model (implementasi custom)
 - **Mixed Precision (AMP)** - Training float16 untuk percepatan
 - **Wavelet Denoising** - preprocessing BayesShrink (opsional)
@@ -80,6 +82,7 @@ pip install -r requirements.txt
 ## Penggunaan
 
 ### Basic Training
+
 ```bash
 # Default (Self-Attention)
 python main.py
@@ -90,6 +93,7 @@ python main.py --attention cbam --epochs 30
 ```
 
 ### Advanced Features
+
 ```bash
 # Preprocessing + segmentasi + ROI
 python main.py --denoise --enhance clahe --segment otsu --input-mode roi --epochs 30
@@ -108,31 +112,36 @@ python main.py --denoise --enhance clahe --segment otsu --input-mode roi --atten
 
 ### Semua Argumen
 
-| Argumen | Default | Deskripsi |
-|---|---|---|
-| `--data-dir` | `datasets` | Path dataset directory |
-| `--batch-size` | `64` | Batch size |
-| `--image-size` | `224` | Image resize size |
-| `--epochs` | `30` | Max training epochs |
-| `--lr` | `1e-4` | Learning rate |
-| `--weight-decay` | `1e-4` | Weight decay |
-| `--patience` | `10` | Early stopping patience |
-| `--save-dir` | `checkpoints` | Checkpoint save directory |
-| `--denoise` | `false` | Enable wavelet denoising |
-| `--enhance` | `none` | Contrast enhancement: none / clahe |
-| `--segment` | `none` | Segmentasi folikel: none / otsu / adaptive |
-| `--input-mode` | `full` | Input model: full / roi / masked |
-| `--seg-pad` | `8` | Padding ROI crop (px) |
-| `--no-pretrained` | `false` | Disable pretrained weights |
-| `--num-workers` | `2` | DataLoader workers |
-| `--attention` | `self_attention` | Attention: self_attention / se_net / cbam / transformer |
-| `--dropout` | `0.3` | Dropout rate |
-| `--gradcam` | `false` | Generate Grad-CAM |
-| `--gradcam-samples` | `5` | Jumlah sampel Grad-CAM |
+| Argumen             | Default          | Deskripsi                                               |
+| ------------------- | ---------------- | ------------------------------------------------------- |
+| `--data-dir`        | `datasets`       | Path dataset directory                                  |
+| `--batch-size`      | `64`             | Batch size                                              |
+| `--image-size`      | `224`            | Image resize size                                       |
+| `--epochs`          | `30`             | Max training epochs                                     |
+| `--lr`              | `1e-4`           | Learning rate                                           |
+| `--weight-decay`    | `1e-4`           | Weight decay                                            |
+| `--patience`        | `10`             | Early stopping patience                                 |
+| `--save-dir`        | `checkpoints`    | Checkpoint save directory                               |
+| `--denoise`         | `false`          | Enable wavelet denoising                                |
+| `--enhance`         | `none`           | Contrast enhancement: none / clahe                      |
+| `--segment`         | `none`           | Segmentasi folikel: none / otsu / adaptive              |
+| `--input-mode`      | `full`           | Input model: full / roi / masked                        |
+| `--seg-pad`         | `8`              | Padding ROI crop (px)                                   |
+| `--no-pretrained`   | `false`          | Disable pretrained weights                              |
+| `--num-workers`     | `2`              | DataLoader workers                                      |
+| `--seed`            | `42`             | Seed split, shuffle, augmentasi, inisialisasi model     |
+| `--no-dedupe`       | `false`          | Nonaktifkan pembuangan salinan identik (md5)            |
+| `--no-pos-weight`   | `false`          | Nonaktifkan pos_weight BCE (ketimpangan kelas)          |
+| `--attention`       | `self_attention` | Attention: self_attention / se_net / cbam / transformer |
+| `--dropout`         | `0.3`            | Dropout rate                                            |
+| `--gradcam`         | `false`          | Generate Grad-CAM                                       |
+| `--gradcam-samples` | `5`              | Jumlah sampel Grad-CAM                                  |
 
 ## Pipeline
 
 ### 1. Preprocessing
+
+- Deduplikasi: salinan byte-identik (md5, keep-first) dibuang sebelum split, aktif secara default (`--no-dedupe` untuk mematikan)
 - Resize 224×224, normalisasi [0,1]
 - Wavelet denoising (BayesShrink) - opsional (`--denoise`)
 - Enhancement CLAHE - opsional (`--enhance clahe`)
@@ -151,23 +160,27 @@ python experiments/run_matrix.py --config experiments/experiments.yml
 python experiments/run_matrix.py --config experiments/experiments.yml --only E1,E2
 ```
 
-| ID | Preprocessing | Segmentasi/ROI | Attention |
-|---|---|---|---|
-| E1 | baseline | none / full | self_attention |
-| E2 | BayesShrink | none / full | self_attention |
-| E3 | BayesShrink + CLAHE | none / full | self_attention |
-| E4 | BayesShrink + CLAHE | otsu / roi | self_attention |
-| E5 | BayesShrink + CLAHE | otsu / masked | self_attention |
-| E6 | BayesShrink + CLAHE | otsu / roi | cbam |
+| ID  | Preprocessing       | Segmentasi/ROI | Attention      |
+| --- | ------------------- | -------------- | -------------- |
+| E1  | baseline            | none / full    | self_attention |
+| E2  | BayesShrink         | none / full    | self_attention |
+| E3  | BayesShrink + CLAHE | none / full    | self_attention |
+| E4  | BayesShrink + CLAHE | otsu / roi     | self_attention |
+| E5  | BayesShrink + CLAHE | otsu / masked  | self_attention |
+| E6  | BayesShrink + CLAHE | otsu / roi     | cbam           |
 
 ### 3. Training
+
 - Optimizer: Adam (lr=1e-4, weight_decay=1e-4)
-- Loss: BCEWithLogitsLoss
+- Loss: BCEWithLogitsLoss dengan pos_weight = rasio n_negatif/n_positif
+  split train (menyeimbangkan gradien ketimpangan 4:1 pasca-dedup; dinonaktifkan
+  dengan `--no-pos-weight`). Nilai yang dipakai terekam di run_summary.json
 - Mixed Precision (AMP) untuk percepatan
 - Early stopping: patience=10
 - Scheduler: ReduceLROnPlateau
 
 ### 4. Evaluasi ganda
+
 - **PCD:** PSNR/SSIM (denoise vs asli), histogram/spektrum, overlay mask, statistik ROI (jumlah region, coverage, luas rata-rata/maksimum).
 - **Medis:** Accuracy, Precision, Recall, F1-Score, Specificity, AUC.
 - Confusion matrix, ROC curve, Grad-CAM heatmap untuk interpretasi.
@@ -196,38 +209,51 @@ Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, dan ringkasan metrik k
 ## Hasil
 
 ### Replikasi Artikel 1: DenseNet-121 + Self-Attention
-| Metrik | Hasil | Artikel |
-|---|---|---|
-| Accuracy | 99.72% | 99.13% |
-| Precision | 100.0% | 100.0% |
-| Recall | 99.50% | 98.51% |
-| F1-Score | 99.75% | 100.0% |
-| Specificity | 100.0% | - |
-| AUC | 100.0% | 99.97% |
+
+> **Tidak valid, tertunda replikasi ulang.** Angka di bawah dihasilkan sebelum
+> dua perbaikan: (1) deduplikasi data (81% test set tadinya punya salinan
+> identik di train) dan (2) perbaikan penempatan self-attention (dulu
+> dijalankan pada satu token hasil pooling sehingga attention-nya degenerasi,
+> kini pada token spasial 7×7 sebelum pooling).
+
+| Metrik      | Hasil  | Artikel |
+| ----------- | ------ | ------- |
+| Accuracy    | 99.72% | 99.13%  |
+| Precision   | 100.0% | 100.0%  |
+| Recall      | 99.50% | 98.51%  |
+| F1-Score    | 99.75% | 100.0%  |
+| Specificity | 100.0% | -       |
+| AUC         | 100.0% | 99.97%  |
 
 ### Matriks Eksperimen E1-E6 (diisi dari `experiments/results/results.csv`)
+
 > Status: menunggu training di Colab
 
-| ID | Accuracy | F1 | AUC | Catatan |
-|---|---|---|---|---|
-| E1 | - | - | - | Baseline |
-| E2 | - | - | - | + BayesShrink |
-| E3 | - | - | - | + CLAHE |
-| E4 | - | - | - | + ROI Otsu |
-| E5 | - | - | - | + Masked Otsu |
-| E6 | - | - | - | + CBAM |
+| ID  | Accuracy | F1  | AUC | Catatan       |
+| --- | -------- | --- | --- | ------------- |
+| E1  | -        | -   | -   | Baseline      |
+| E2  | -        | -   | -   | + BayesShrink |
+| E3  | -        | -   | -   | + CLAHE       |
+| E4  | -        | -   | -   | + ROI Otsu    |
+| E5  | -        | -   | -   | + Masked Otsu |
+| E6  | -        | -   | -   | + CBAM        |
 
 ### Perbandingan Attention Mechanisms
+
 Perbandingan attention diwakili eksperimen E4 (self-attention) vs E6 (CBAM)
 pada tabel matriks E1-E6 di atas; kolom parameter dan latency tercatat di
-`experiments/results/results.csv`. Detail prinsip kerja tiap mekanisme:
+`experiments/results/results.csv`. Semua mekanisme dijalankan pada peta fitur
+2D sebelum pooling: SE/CBAM pada (B, C, H, W); self-attention/transformer
+pada token spasial (B, H·W, C) dengan N = H·W (7×7 untuk input 224px).
+Detail prinsip kerja tiap mekanisme:
 
-| Mekanisme | Parameters | Prinsip Kerja |
-|-----------|------------|---------------|
-| **Self-Attention** | 11.4M | Q, K, V multi-head (Artikel 1) |
-| **CBAM** | 7.3M | Channel + Spatial attention |
+| Mekanisme          | Parameters | Prinsip Kerja                  |
+| ------------------ | ---------- | ------------------------------ |
+| **Self-Attention** | 11.4M      | Q, K, V multi-head (Artikel 1) |
+| **CBAM**           | 7.3M       | Channel + Spatial attention    |
 
 ## Dataset
 
-- **PCOS-XAI Ultrasound Dataset** - 11.784 gambar (6.784 PCOS, 5.000 sehat)
+- **PCOS-XAI Ultrasound Dataset** - 11.784 gambar mentah (6.784 PCOS, 5.000 sehat)
+- Deduplikasi md5 otomatis sebelum split: 3.996 gambar unik (3.184 PCOS, 812 sehat; rasio kelas 4:1, laporkan specificity/F1/AUC bersama akurasi)
 - Source: [Kaggle](https://www.kaggle.com/datasets/ibadeus/pcos-xai-ultrasound-dataset)

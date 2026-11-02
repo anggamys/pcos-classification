@@ -23,22 +23,22 @@ Klasifikasi PCOS dengan DenseNet-121 + Attention dan Grad-CAM**.
 
 ### 1.1. Artikel 1: Tiwari, Shukla, & Sharma (2026)
 
-> *Attention-guided lightweight deep learning architecture for classification
-> of polycystic ovary syndrome from ultrasound images.*
+> _Attention-guided lightweight deep learning architecture for classification
+> of polycystic ovary syndrome from ultrasound images._
 > Intelligence-Based Medicine, 13, 100358.
 
 **Masalah yang diangkat.** Arsitektur CNN konvensional sulit menangkap
-*long-range contextual dependencies* pada citra USG grayscale, sehingga
+_long-range contextual dependencies_ pada citra USG grayscale, sehingga
 diskriminasi folikel ovarium menjadi kurang andal. Di sisi lain, model yang
 akurat umumnya berat dan tidak cocok untuk layanan primer atau aplikasi
 kesehatan seluler dengan sumber daya terbatas.
 
 **Metode.** Empat backbone (CNN kustom, VGG19, DenseNet-121, EfficientNet-B0)
-masing-masing dipadukan modul *self-attention* (proyeksi Q, K, V dengan
-*scaled dot-product attention*). Preprocessing memakai denoising wavelet
+masing-masing dipadukan modul _self-attention_ (proyeksi Q, K, V dengan
+_scaled dot-product attention_). Preprocessing memakai denoising wavelet
 metode BayesShrink dilanjutkan Gaussian smoothing; augmentasi berupa rotasi,
-*flip* horizontal, dan *zoom*. Pelatihan memakai optimizer Adam dengan
-*binary cross-entropy loss*. Dataset yang dipakai adalah PCOS-XAI Ultrasound
+_flip_ horizontal, dan _zoom_. Pelatihan memakai optimizer Adam dengan
+_binary cross-entropy loss_. Dataset yang dipakai adalah PCOS-XAI Ultrasound
 Dataset (11.784 citra: 6.784 PCOS, 5.000 sehat) yang memang memuat persoalan
 dunia nyata seperti duplikat, multi-resolusi, dan
 ketidakseimbangan kelas, namun tanpa metadata pasien. Yang perlu digarisbawahi:
@@ -50,14 +50,14 @@ tidak terukur secara terpisah.
 DenseNet-121 + Attention menjadi yang terbaik (presisi 1,000; recall 0,9851;
 AUC 0,9997), sedangkan EfficientNet-B0 + Attention (4,87 juta parameter)
 menjadi solusi paling hemat parameter dengan akurasi setara. Klaim utama:
-arsitektur ringan ber-attention layak untuk skrining *real-time* dan
-*low-resource*. Penulis menutup dengan peluang pendekatan multimodal
+arsitektur ringan ber-attention layak untuk skrining _real-time_ dan
+_low-resource_. Penulis menutup dengan peluang pendekatan multimodal
 sebagai pekerjaan lanjutan.
 
 ### 1.2. Artikel 2: Sundari et al. (2025)
 
-> *Transfer Learning-Enhanced CNN Model for Integrative Ultrasound and
-> Biomarker-Based Diagnosis of Polycystic Ovarian Disease.*
+> _Transfer Learning-Enhanced CNN Model for Integrative Ultrasound and
+> Biomarker-Based Diagnosis of Polycystic Ovarian Disease._
 > Scientific Reports, 15:34519.
 
 **Masalah yang diangkat.** Interpretasi USG transvaginal bersifat subjektif dan
@@ -66,7 +66,7 @@ Studi-studi terdahulu cenderung terbatas pada dataset kecil, minim optimasi mode
 dan minim integrasi data klinis multimodal.
 
 **Metode.** Backbone Enhanced EfficientNet-B3 dengan modul attention,
-*batch normalization*, dan dropout (0,35, ditemukan melalui Bayesian
+_batch normalization_, dan dropout (0,35, ditemukan melalui Bayesian
 Optimization). Hyperparameter (learning rate, batch size, dropout, pilihan
 optimizer, unit fully-connected) disetel dengan Bayesian Optimization.
 Ketidakseimbangan kelas ditangani dengan SMOTE pada fitur klinis tabular
@@ -75,14 +75,14 @@ interpretabilitas disediakan lewat visualisasi Grad-CAM. Dataset memakai
 PCOSGen (~3.200 citra berlabel) beserta metadata klinis (LH, FSH, AMH).
 
 **Catatan umum kedua artikel:** keduanya hanya melaporkan metrik
-*point-estimate* tunggal (akurasi, AUC, dan sejenisnya) tanpa interval
+_point-estimate_ tunggal (akurasi, AUC, dan sejenisnya) tanpa interval
 kepercayaan, kalibrasi, maupun kuantifikasi ketidakpastian prediksi.
 
 **Hasil dan klaim.** Akurasi 94,8% (sensitivitas 93,2%; spesifisitas 95,5%;
 presisi 94,0%; F1 93,6%; AUC 0,97). Studi ablasi menunjukkan penambahan modul
 attention saja menaikkan akurasi 91,0% → 93,2%, dan kombinasi
 attention + augmentasi mencapai 94,8%. **Catatan penting yang dinyatakan
-penulis sendiri:** data biomarker (LH, FSH, AMH) *tidak* dimasukkan ke model
+penulis sendiri:** data biomarker (LH, FSH, AMH) _tidak_ dimasukkan ke model
 klasifikasi final yang menghasilkan angka-angka tersebut. Biomarker hanya
 dipakai untuk analisis komparatif/visualisasi karena data
 citra-biomarker berpasangan yang tersedia terbatas. Arsitektur fusi multimodal
@@ -99,13 +99,13 @@ itulah yang dipetakan pada Section 2.
 
 ## 2. Research gap dari kedua artikel
 
-| No | Gap | Bukti dari artikel |
-|----|-----|--------------------|
-| G1 | Fusi multimodal citra + biomarker dideskripsikan tetapi **tidak diimplementasikan/dievaluasi** | Artikel 2 §4.1: biomarker tidak masuk model final; integrasi penuh dinyatakan sebagai *subsequent work* |
-| G2 | **Tanpa validasi silang antar dataset;** keduanya hanya validasi internal pada satu dataset | Artikel 1 memakai PCOS-XAI saja; Artikel 2 memakai PCOSGen saja |
-| G3 | **Tanpa kuantifikasi ketidakpastian;** output hanya prediksi biner tanpa interval kepercayaan | Tidak ada MC Dropout, ensemble, maupun kalibrasi pada keduanya |
-| G4 | **Tanpa perbandingan sistematis mekanisme attention;** masing-masing memakai satu varian | Artikel 1: satu modul SA; Artikel 2: modul attention tidak dirinci variannya dan tanpa pembanding |
-| G5 | Klaim **lightweight/low-resource tanpa benchmark deployment** (latency, memori, uji perangkat) | Artikel 1 mengklaim cocok untuk *portable ultrasound* tanpa pengukuran latency/inferensi |
+| No  | Gap                                                                                            | Bukti dari artikel                                                                                      |
+| --- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| G1  | Fusi multimodal citra + biomarker dideskripsikan tetapi **tidak diimplementasikan/dievaluasi** | Artikel 2 §4.1: biomarker tidak masuk model final; integrasi penuh dinyatakan sebagai _subsequent work_ |
+| G2  | **Tanpa validasi silang antar dataset;** keduanya hanya validasi internal pada satu dataset    | Artikel 1 memakai PCOS-XAI saja; Artikel 2 memakai PCOSGen saja                                         |
+| G3  | **Tanpa kuantifikasi ketidakpastian;** output hanya prediksi biner tanpa interval kepercayaan  | Tidak ada MC Dropout, ensemble, maupun kalibrasi pada keduanya                                          |
+| G4  | **Tanpa perbandingan sistematis mekanisme attention;** masing-masing memakai satu varian       | Artikel 1: satu modul SA; Artikel 2: modul attention tidak dirinci variannya dan tanpa pembanding       |
+| G5  | Klaim **lightweight/low-resource tanpa benchmark deployment** (latency, memori, uji perangkat) | Artikel 1 mengklaim cocok untuk _portable ultrasound_ tanpa pengukuran latency/inferensi                |
 
 G1 adalah gap terbesar secara akademik, tetapi tidak diambil karena dataset
 citra-biomarker berpasangan yang terbuka sulit diperoleh. G2-G3 dicatat sebagai
@@ -150,27 +150,36 @@ formal tidak valid, batasan ini dinyatakan sejak awal).
   prosedur pada 3.6). Namun Artikel 1 tidak pernah mengukur kontribusi
   denoising secara terpisah (tanpa ablasi denoise vs non-denoise). H1 mengisi
   kekurangan itu dengan menguji klaim preprocessing tersebut secara langsung.
-- **Diuji oleh:** eksperimen E1 vs E2. **Kriteria:** H1 diterima jika rata-rata
-  PSNR/SSIM E2 > E1 dan akurasi/AUC E2 ≥ E1.
+- **Diuji oleh:** eksperimen E1 vs E2. **Kriteria:** H1 diterima jika akurasi
+  atau AUC E2 lebih tinggi secara ketat (">") dari E1 pada minimal satu metrik,
+  tanpa regresi melebihi 0,005 pada metrik satunya; hasil identik tidak
+  dihitung diterima. PSNR/SSIM dilaporkan sebagai bukti deskriptif sisi PCD,
+  bukan penentu verdict: tanpa citra ground-truth bersih, PSNR/SSIM
+  (raw vs denoised) mengukur seberapa besar citra berubah, bukan kualitas
+  yang lebih baik.
 
 ### H2: Segmentasi/ROI folikel meningkatkan akurasi klasifikasi
 
-- **H0:** Input ROI/*masked* dari segmentasi folikel unsupervised tidak
+- **H0:** Input ROI/_masked_ dari segmentasi folikel unsupervised tidak
   meningkatkan akurasi dibanding citra penuh.
-- **H1:** Input ROI/*masked* meningkatkan akurasi/F1/AUC karena model fokus
+- **H1:** Input ROI/_masked_ meningkatkan akurasi/F1/AUC karena model fokus
   pada area folikel dan kurang terpengaruh background.
 - **Landasan dari literatur:** Artikel 1 menyatakan modul self-attention
   membuat model "fokus pada area folikular dan ovarial yang salient"
   (Pendahuluan; §3.2) dan diskusinya mengonfirmasi model berfokus pada
-  "*cystic follicles and abnormal ovarian texture instead of background
-  noise*" (§5). Artikel 2 menyatakan modul attention "menekankan region
+  "_cystic follicles and abnormal ovarian texture instead of background
+  noise_" (§5). Artikel 2 menyatakan modul attention "menekankan region
   spasial yang relevan dan menekan background noise" untuk mendeteksi
-  "*follicular clusters and cystic formations*" (§3.1.3). Kriteria Rotterdam
+  "_follicular clusters and cystic formations_" (§3.1.3). Kriteria Rotterdam
   sendiri berbasis jumlah folikel/volume ovarium (§1). Kedua artikel
-  mengandalkan *attention implisit* untuk fokus folikel, tetapi tidak pernah
-  menguji *fokus eksplisit* lewat segmentasi/ROI. Celah inilah yang diuji H2.
-- **Diuji oleh:** eksperimen E3 vs E4 vs E5. **Kriteria:** H2 diterima jika
-  F1/AUC E4 atau E5 > E3.
+  mengandalkan _attention implisit_ untuk fokus folikel, tetapi tidak pernah
+  menguji _fokus eksplisit_ lewat segmentasi/ROI. Celah inilah yang diuji H2.
+- **Diuji oleh:** eksperimen E3 vs E4 vs E5. **Kriteria:** varian utama
+  diprespesifikasi sejak awal, yaitu E4 (ROI crop Otsu), dengan AUC sebagai
+  metrik utama. H2 diterima jika AUC E4 > E3 dan F1 E4 tidak lebih buruk
+  melebihi 0,005. E5 (masked) dilaporkan deskriptif sebagai pembanding
+  sekunder dan tidak ikut menentukan verdict, sehingga tidak terjadi seleksi
+  varian terbaik di atas test set.
 
 ### H3: CBAM setara akurat dengan parameter lebih sedikit (efisien)
 
@@ -184,7 +193,7 @@ formal tidak valid, batasan ini dinyatakan sejak awal).
   terbaik antara akurasi, sensitivitas, dan efisiensi" (Tabel 2; §5).
   Artikel 2 lewat studi ablasi membuktikan penambahan modul attention saja
   menaikkan akurasi 91,0% → 93,2% (Tabel 3). Namun keduanya belum membandingkan
-  *antar mekanisme attention* maupun mengukur latency. Celah inilah yang
+  _antar mekanisme attention_ maupun mengukur latency. Celah inilah yang
   dijawab H3 (G4 + G5).
 - **Diuji oleh:** eksperimen E4 vs E6. **Kriteria:** H3 diterima jika
   akurasi/AUC E6 ≥ E4 − 0,5 poin dengan parameter lebih sedikit dan latency
@@ -201,26 +210,37 @@ dilacak sampai ke angka.
 
 ### 4.1. Desain umum
 
-- **Dataset:** PCOS-XAI Ultrasound Dataset (11.784 citra: 6.784 PCOS, 5.000
-  sehat), split 70/15/15 dengan seed tetap (42) agar seluruh eksperimen
-  sebanding.
-- **Pipeline:** citra USG → enhancement (CLAHE, opsional) → wavelet denoising
-  (BayesShrink) → segmentasi folikel unsupervised (Otsu/adaptive + morfologi +
-  hapus komponen tepi + fallback persentil) → input model (full / ROI crop /
-  masked) → DenseNet-121 + Attention → Grad-CAM.
+- **Dataset:** PCOS-XAI Ultrasound Dataset (11.784 citra mentah: 6.784 PCOS,
+  5.000 sehat). Sebelum split, salinan byte-identik dibuang via hash md5
+  (keep-first) karena split acak level citra bisa menaruh salinan yang sama
+  di train sekaligus test dan menggelembungkan metrik. Hasil dedup: 3.996
+  citra unik (3.184 PCOS, 812 sehat), tanpa duplikat lintas kelas. Konsekuensi
+  rasio kelas menjadi 4:1, sehingga akurasi saja menyesatkan dan specificity,
+  F1, serta AUC wajib dilaporkan bersamaan. Ketimpangan ini ditangani secara
+  prespecified dan seragam di seluruh eksperimen lewat pos_weight BCE
+  (rasio n_negatif/n_positif dari split train saja, tanpa resampling data;
+  dapat dinonaktifkan dengan --no-pos-weight untuk keperluan kontrol).
+  Split 70/15/15 dengan seed tetap
+  (42) untuk split, shuffle, augmentasi, dan inisialisasi model agar seluruh
+  eksperimen sebanding dan reprodusibel.
+- **Pipeline:** citra USG → deduplikasi (hash md5) → enhancement (CLAHE,
+  opsional) → wavelet denoising (BayesShrink) → segmentasi folikel
+  unsupervised (Otsu/adaptive + morfologi + hapus komponen tepi + fallback
+  persentil) → input model (full / ROI crop / masked) → DenseNet-121 +
+  Attention → Grad-CAM.
 - **Perangkat:** Google Colab GPU T4 (±10 GB VRAM), estimasi ±50-60 menit per
   run 30 epoch.
 
 ### 4.2. Matriks eksperimen dan pemetaan hipotesis
 
-| ID | Preprocessing | Segmentasi/ROI | Attention | Menguji |
-|----|---------------|----------------|-----------|---------|
-| E1 | baseline | none / full | self-attention | baseline H1 |
-| E2 | BayesShrink | none / full | self-attention | H1 |
-| E3 | BayesShrink + CLAHE | none / full | self-attention | baseline H2 |
-| E4 | BayesShrink + CLAHE | otsu / roi | self-attention | H2, baseline H3 |
-| E5 | BayesShrink + CLAHE | otsu / masked | self-attention | H2 |
-| E6 | BayesShrink + CLAHE | otsu / roi | cbam | H3 |
+| ID  | Preprocessing       | Segmentasi/ROI | Attention      | Menguji         |
+| --- | ------------------- | -------------- | -------------- | --------------- |
+| E1  | baseline            | none / full    | self-attention | baseline H1     |
+| E2  | BayesShrink         | none / full    | self-attention | H1              |
+| E3  | BayesShrink + CLAHE | none / full    | self-attention | baseline H2     |
+| E4  | BayesShrink + CLAHE | otsu / roi     | self-attention | H2, baseline H3 |
+| E5  | BayesShrink + CLAHE | otsu / masked  | self-attention | H2              |
+| E6  | BayesShrink + CLAHE | otsu / roi     | cbam           | H3              |
 
 Setiap eksperimen menyimpan checkpoint, plot, `stdout.log`, dan ringkasan
 metrik (`experiments/results/results.csv`, termasuk `total_params` dan
@@ -247,7 +267,16 @@ dihasilkan tanpa training oleh `experiments/evaluate_quality.py` ke
    Dice klinis).
 2. Satu split train/val/test → perbandingan metrik bersifat deskriptif, tanpa
    klaim signifikansi statistik.
-3. Fusi multimodal (G1), validasi antar dataset (G2), dan kuantifikasi
+3. Split dilakukan pada level citra, bukan level pasien/video: deduplikasi
+   hanya membuang salinan byte-identik, sementara frame berurutan dari video
+   USG yang sama bisa nyaris identik tetapi tak terdeteksi hash. Jika metadata
+   pasien tersedia, split level pasien adalah perbaikan lanjutan yang
+   disarankan.
+4. Setiap eksperimen dijalankan sekali dengan satu seed (42). Variasi antar
+   seed tidak diukur, dan toleransi verdict 0,005 berada di dekat rentang
+   noise run-to-run; replikasi multi-seed disarankan bila kuota Colab
+   memungkinkan.
+5. Fusi multimodal (G1), validasi antar dataset (G2), dan kuantifikasi
    ketidakpastian (G3) di luar scope dan dicatat sebagai saran lanjutan.
 
 ---
@@ -256,11 +285,10 @@ dihasilkan tanpa training oleh `experiments/evaluate_quality.py` ke
 
 1. Tiwari, S., Shukla, A., & Sharma, A.K. (2026). Attention-guided
    lightweight deep learning architecture for classification of polycystic
-   ovary syndrome from ultrasound images. *Intelligence-Based Medicine*, 13,
-   100358. https://doi.org/10.1016/j.ibmed.2026.100358
+   ovary syndrome from ultrasound images. _Intelligence-Based Medicine_, 13, 100358. https://doi.org/10.1016/j.ibmed.2026.100358
 2. Sundari, M.S., et al. (2025). Transfer Learning-Enhanced CNN Model for
    Integrative Ultrasound and Biomarker-Based Diagnosis of Polycystic Ovarian
-   Disease. *Scientific Reports*, 15:34519.
+   Disease. _Scientific Reports_, 15:34519.
    https://doi.org/10.1038/s41598-025-17711-w
 
 ---

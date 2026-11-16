@@ -88,9 +88,7 @@ class TrainPosWeightIntegrationTests(unittest.TestCase):
         self.features = torch.randn(40, 4, generator=rng)
         self.labels = torch.tensor([1.0] * 30 + [0.0] * 10)  # pos_weight 1/3
 
-        loader = DataLoader(
-            TensorDataset(self.features, self.labels), batch_size=8
-        )
+        loader = DataLoader(TensorDataset(self.features, self.labels), batch_size=8)
         self.train_loader = loader
         self.val_loader = loader
         self.config = {
@@ -156,9 +154,7 @@ class TrainPosWeightIntegrationTests(unittest.TestCase):
             torch.device("cpu"),
         )
 
-        summary = json.loads(
-            (Path(self.tmp.name) / "run_summary.json").read_text()
-        )
+        summary = json.loads((Path(self.tmp.name) / "run_summary.json").read_text())
         self.assertEqual(summary["loss"]["type"], "BCEWithLogitsLoss")
         self.assertAlmostEqual(summary["loss"]["pos_weight"], 1 / 3, places=5)
 

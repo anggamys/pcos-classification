@@ -114,15 +114,20 @@ perbedaan hasil hanya berasal dari perlakuan yang diuji.
 Urutan pipeline dan titik variasinya:
 
 1. Baca citra dan konversi RGB.
-2. Wavelet denoising BayesShrink (`--denoise`): dekomposisi `db4` level 3,
+2. Enhancement CLAHE (`--enhance clahe`), opsional.
+3. Wavelet denoising BayesShrink (`--denoise`): dekomposisi `db4` level 3,
    sigma noise dari median koefisien HH1, soft threshold adaptif per subband,
-   rekonstruksi di-crop ke ukuran asli.
-3. Enhancement CLAHE (`--enhance clahe`), opsional.
+   rekonstruksi di-crop ke ukuran asli. Urutan CLAHE lalu denoise dipakai
+   konsisten oleh training dan evaluasi kualitas.
 4. Segmentasi folikel unsupervised (`--segment otsu` atau `adaptive`):
-   threshold, morfologi, hapus komponen tepi, fallback persentil bila region
-   kosong.
+   threshold, morfologi, hapus komponen tepi, fallback persentil bila cakupan
+   melebihi 0,5. Mask selalu dihitung pada skala kerja tetap 224x224 agar
+   radius morfologi dan `min_area` setara antar citra, lalu di-upscale
+   nearest-neighbor ke resolusi asli.
 5. Mode input (`--input-mode full|roi|masked`): citra penuh, crop ROI dengan
-   padding, atau citra dengan latar disamarkan.
+   padding, atau citra dengan latar disamarkan. Bila mask kosong, ROI dan
+   masked sama-sama memakai citra asli; mode masked tidak boleh menghasilkan
+   citra hitam.
 6. Resize 224x224 dan normalisasi ImageNet.
 
 Praproses deterministik di-cache per citra selama satu run, sedangkan
@@ -144,6 +149,7 @@ Protokol sama untuk semua eksperimen (satu sumber nilai di
 | Early stopping | patience 10 pada val_loss                           |
 | Scheduler      | ReduceLROnPlateau                                   |
 | Presisi        | AMP float16 pada GPU                                |
+| Device         | auto: CUDA bila tersedia, fallback CPU di lokal     |
 | Seed           | 42                                                  |
 
 `pos_weight` dihitung dari label split train saja, yaitu n_negatif/n_positif.
@@ -225,6 +231,8 @@ gabungkan berkas dari sesi sebelumnya bila ingin riwayat lengkap.
 ## 10. Checklist sebelum run
 
 - [ ] Drive sudah di-mount (Colab) dan `echo $DATA_DIR` menunjuk path benar.
+- [ ] Runtime Colab memakai T4 GPU; default `device: auto` memilih CUDA, dan
+      `device: cuda` dipakai bila ingin gagal cepat saat GPU tidak aktif.
 - [ ] Tiga perintah verifikasi di bagian 2 menghasilkan 6.784, 5.000, 11.784.
 - [ ] Working tree bersih dan commit sudah di-push, agar hash commit di
       `run_summary.json` menunjuk kode yang benar-benar dipakai.
@@ -234,6 +242,12 @@ gabungkan berkas dari sesi sebelumnya bila ingin riwayat lengkap.
       membandingkan, karena nama folder per eksperimen akan dipakai ulang.
 
 ## 11. Catatan replikasi
+
+Resolusi citra berbeda antar kelas: median infected 279x266 (0,073 megapiksel),
+noninfected 848x630 (0,491 megapiksel). Segmentasi karena itu dihitung pada
+skala kerja tetap 224x224 agar radius morfologi dan ambang luas setara, lalu
+mask di-upscale ke resolusi asli. Perbedaan resolusi tetap dilaporkan sebagai
+ancaman validitas karena dapat menjadi isyarat palsu bagi model.
 
 Hasil lama (accuracy 99,72%) tidak sah dan tidak boleh dikutip: dibuat sebelum
 deduplikasi dan sebelum perbaikan penempatan attention. Checkpoint lama juga

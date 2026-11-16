@@ -225,11 +225,14 @@ dilacak sampai ke angka.
   eksperimen sebanding dan reprodusibel.
 - **Pipeline:** citra USG → deduplikasi (hash md5) → enhancement (CLAHE,
   opsional) → wavelet denoising (BayesShrink) → segmentasi folikel
-  unsupervised (Otsu/adaptive + morfologi + hapus komponen tepi + fallback
-  persentil) → input model (full / ROI crop / masked) → DenseNet-121 +
+  unsupervised pada skala kerja tetap 224x224 (Otsu/adaptive + morfologi +
+  hapus komponen tepi + fallback persentil), mask di-upscale ke resolusi asli
+  → input model (full / ROI crop / masked) → DenseNet-121 +
   Attention → Grad-CAM.
 - **Perangkat:** Google Colab GPU T4 (±10 GB VRAM), estimasi ±50-60 menit per
-  run 30 epoch.
+  run 30 epoch. Pemilihan device default `auto`: CUDA dipakai bila tersedia,
+  CPU hanya sebagai fallback untuk mesin lokal dengan torch CPU-only. Untuk
+  memaksa GPU dan gagal cepat saat runtime tanpa GPU, pakai `--device cuda`.
 
 ### 4.2. Matriks eksperimen dan pemetaan hipotesis
 

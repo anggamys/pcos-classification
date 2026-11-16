@@ -132,6 +132,7 @@ python main.py --denoise --enhance clahe --segment otsu --input-mode roi --atten
 | `--seed`            | `42`             | Seed split, shuffle, augmentasi, inisialisasi model     |
 | `--no-dedupe`       | `false`          | Nonaktifkan pembuangan salinan identik (md5)            |
 | `--no-pos-weight`   | `false`          | Nonaktifkan pos_weight BCE (ketimpangan kelas)          |
+| `--device`          | `auto`           | auto (GPU bila ada) / cuda (wajib GPU) / cpu            |
 | `--attention`       | `self_attention` | Attention: self_attention / se_net / cbam / transformer |
 | `--dropout`         | `0.3`            | Dropout rate                                            |
 | `--gradcam`         | `false`          | Generate Grad-CAM                                       |
@@ -145,8 +146,8 @@ python main.py --denoise --enhance clahe --segment otsu --input-mode roi --atten
 - Resize 224×224, normalisasi [0,1]
 - Wavelet denoising (BayesShrink) - opsional (`--denoise`)
 - Enhancement CLAHE - opsional (`--enhance clahe`)
-- Segmentasi folikel unsupervised: Otsu/adaptive + morfologi + hapus komponen tepi (`--segment`)
-- Mode input: citra penuh, ROI crop, atau masked (`--input-mode`)
+- Segmentasi folikel unsupervised: Otsu/adaptive + morfologi + hapus komponen tepi (`--segment`), dihitung pada skala kerja tetap 224×224 lalu mask di-upscale ke resolusi asli
+- Mode input: citra penuh, ROI crop, atau masked (`--input-mode`); mask kosong dikembalikan sebagai citra asli, bukan citra hitam
 - Augmentasi: RandomRotation(15), RandomHorizontalFlip, RandomResizedCrop
 
 ### 2. Matriks Eksperimen (Tugas Akhir PCD + Citra Medis)
@@ -181,11 +182,18 @@ python experiments/run_matrix.py --config experiments/experiments.yml --only E1,
 
 ### 4. Evaluasi ganda
 
-- **PCD:** PSNR/SSIM (denoise vs asli), histogram/spektrum, overlay mask, statistik ROI (jumlah region, coverage, luas rata-rata/maksimum).
+- **PCD:** PSNR/SSIM (denoise vs asli), histogram/spektrum, overlay mask, statistik ROI (jumlah region, coverage, luas rata-rata/maksimum). PSNR/SSIM mengukur kesetiaan terhadap citra asli, bukan efektivitas penghilangan noise; nilai rendah pada CLAHE wajar karena perubahannya nonlinear.
 - **Medis:** Accuracy, Precision, Recall, F1-Score, Specificity, AUC.
 - Confusion matrix, ROC curve, Grad-CAM heatmap untuk interpretasi.
 
 ### Menjalankan di Colab (T4)
+
+Aktifkan GPU lebih dulu: **Runtime > Change runtime type > T4 GPU**. Default
+`--device auto` langsung memakai CUDA bila tersedia, dan `run_matrix.py`
+meneruskan `device: auto` dari YAML ke setiap eksperimen. Di lokal dengan torch
+CPU-only, nilai yang sama otomatis turun ke CPU. Untuk memastikan run tidak
+diam-diam memakai CPU di Colab, jalankan dengan `--device cuda` (gagal cepat
+bila GPU belum aktif).
 
 ```bash
 # 0. Bukti sisi PCD untuk H1 (tanpa training, cepat, bisa jalan di CPU)
@@ -197,6 +205,9 @@ python experiments/run_matrix.py --config experiments/experiments.yml --data-dir
 # Sebagian dulu (disarankan untuk sesi Colab pendek)
 python experiments/run_matrix.py --config experiments/experiments.yml --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30 --only E1,E2
 ```
+
+Ganti `device: auto` menjadi `device: cuda` di `experiments/experiments.yml`
+bila ingin matrix berhenti dengan pesan jelas saat runtime tidak punya GPU.
 
 Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, `training.log`, dan ringkasan metrik ke `experiments/results/results.csv`. Saat dijalankan lewat `run_matrix.py`, log training juga tampil live di terminal (stdout dan stderr digabung). Estimasi ±50-60 menit per run 30 epoch di T4.
 

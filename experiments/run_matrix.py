@@ -180,7 +180,10 @@ def stream_subprocess(cmd: list, log_path: Path) -> tuple[int, str]:
 
         try:
             while True:
-                raw = proc.stdout.read(4096)
+                # read1 mengembalikan byte yang sudah tersedia tanpa menunggu
+                # buffer 4096 penuh, sehingga progress bar dan log langsung
+                # tampil saat child masih berjalan.
+                raw = proc.stdout.read1(4096)
 
                 if not raw:
                     break

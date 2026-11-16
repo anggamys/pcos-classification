@@ -10,6 +10,7 @@ override the YAML defaults when explicitly passed.
 """
 
 import argparse
+import codecs
 import csv
 import json
 import re
@@ -123,7 +124,9 @@ def build_command(experiment: dict, save_dir: Path) -> list:
     Returns:
         list: Perintah siap `subprocess.run` (melewati nilai None).
     """
-    cmd = [sys.executable, str(PROJECT_ROOT / "main.py")]
+    # -u: paksa stdout child unbuffered agar log epoch muncul real-time
+    # di terminal saat run_matrix memantau proses.
+    cmd = [sys.executable, "-u", str(PROJECT_ROOT / "main.py")]
     for flag, key in MAIN_FLAGS:
         value = experiment.get(key)
 
@@ -143,8 +146,74 @@ def build_command(experiment: dict, save_dir: Path) -> list:
     return cmd
 
 
+def stream_subprocess(cmd: list, log_path: Path) -> tuple[int, str]:
+    """Jalankan subprocess dengan keluaran di-stream live ke terminal.
+
+    stdout dan stderr digabung, lalu dibaca per potongan byte (bukan per
+    baris) supaya pembaruan progress bar tqdm yang memakai carriage return
+    ikut tampil real-time. Seluruh keluaran tetap tersimpan utuh di berkas
+    log, termasuk saat proses gagal atau dihentikan.
+
+    Args:
+        cmd (list): Perintah siap dieksekusi.
+        log_path (Path): Berkas log tujuan.
+
+    Returns:
+        tuple: (returncode, seluruh teks keluaran).
+
+    Raises:
+        KeyboardInterrupt: Setelah child dihentikan dan log parsial ditulis.
+    """
+    chunks: list[str] = []
+    interrupted = False
+
+    with subprocess.Popen(
+        cmd,
+        cwd=str(PROJECT_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    ) as proc:
+        assert proc.stdout is not None
+        decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+
+        try:
+            while True:
+                raw = proc.stdout.read1(4096)
+
+                if not raw:
+                    break
+
+                text = decoder.decode(raw)
+
+                if text:
+                    chunks.append(text)
+                    sys.stdout.write(text)
+                    sys.stdout.flush()
+        except KeyboardInterrupt:
+            proc.terminate()
+            proc.wait()
+            interrupted = True
+        else:
+            returncode = proc.wait()
+        finally:
+            tail = decoder.decode(b"", final=True)
+
+            if tail:
+                chunks.append(tail)
+                sys.stdout.write(tail)
+                sys.stdout.flush()
+
+    output = "".join(chunks)
+    log_path.write_text(output)
+
+    if interrupted:
+        raise KeyboardInterrupt
+
+    return returncode, output
+
+
 def run_experiment(experiment: dict, out_root: Path) -> dict:
-    """Jalankan satu eksperimen sebagai subprocess + kumpulkan hasilnya.
+    """Jalankan satu eksperimen sebagai subprocess dengan log live.
 
     Args:
         experiment (dict): Config eksperimen hasil merge YAML.
@@ -159,11 +228,8 @@ def run_experiment(experiment: dict, out_root: Path) -> dict:
     cmd = build_command(experiment, save_dir)
     log_path = save_dir / "stdout.log"
 
-    proc = subprocess.run(
-        cmd, cwd=str(PROJECT_ROOT), capture_output=True, text=True, check=False
-    )
-
-    log_path.write_text(proc.stdout + "\n\n===== STDERR =====\n" + proc.stderr)
+    print(f"{experiment['id']}: {experiment['desc']}", flush=True)
+    returncode, output = stream_subprocess(cmd, log_path)
 
     result = {
         "id": experiment["id"],
@@ -174,16 +240,16 @@ def run_experiment(experiment: dict, out_root: Path) -> dict:
         "input_mode": experiment["input_mode"],
         "attention": experiment["attention"],
         "pos_weight": experiment.get("pos_weight", True),
-        "returncode": proc.returncode,
+        "returncode": returncode,
     }
 
-    result.update(parse_metrics(proc.stdout))
+    result.update(parse_metrics(output))
     total_params, infer_ms = model_stats(experiment["attention"])
     result["total_params"] = total_params
     result["infer_ms_cpu"] = infer_ms
-    status = "OK" if proc.returncode == 0 else "FAIL"
+    status = "OK" if returncode == 0 else "FAIL"
 
-    print(f"[{status}] {experiment['id']}: {experiment['desc']}")
+    print(f"{experiment['id']} status: {status}", flush=True)
 
     return result
 
@@ -241,7 +307,7 @@ def main() -> None:
 
     if args.dry_run:
         for experiment in selected:
-            print(f"[{experiment['id']}] {experiment['desc']}")
+            print(f"{experiment['id']}: {experiment['desc']}")
 
         return
 
@@ -253,7 +319,7 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"\nSaved {csv_path}")
+    print(f"Saved {csv_path}")
     save_matrix_summary(out_root, rows)
 
 

@@ -198,12 +198,12 @@ python experiments/run_matrix.py --config experiments/experiments.yml --data-dir
 python experiments/run_matrix.py --config experiments/experiments.yml --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30 --only E1,E2
 ```
 
-Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, dan ringkasan metrik ke `experiments/results/results.csv`. Estimasi ±50-60 menit per run 30 epoch di T4.
+Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, `training.log`, dan ringkasan metrik ke `experiments/results/results.csv`. Saat dijalankan lewat `run_matrix.py`, log training juga tampil live di terminal (stdout dan stderr digabung). Estimasi ±50-60 menit per run 30 epoch di T4.
 
 ### Dokumentasi JSON (proses & hasil machine-readable)
 
 - Tiap run menulis `run_summary.json` di folder `--save-dir`-nya: timestamp, git commit, environment (device/GPU/versi torch), config lengkap, ukuran dataset, parameter model, history per-epoch, epoch terbaik, flag early stopping, metrik test, dan daftar artefak.
-- `run_matrix.py` menulis `matrix_summary.json` di `out_dir`: seluruh baris eksperimen + verdict deskriptif H1–H3 (`accepted`/`not_accepted`, hanya untuk eksperimen yang datanya tersedia) + salinan tiap `run_summary.json`.
+- `run_matrix.py` menulis `matrix_summary.json` di `out_dir`: seluruh baris eksperimen + verdict deskriptif H1-H3 (`accepted`/`not_accepted`, hanya untuk eksperimen yang datanya tersedia) + salinan tiap `run_summary.json`.
 - `evaluate_quality.py` menulis `summary.json` di samping `summary.txt` (mean/std/min/max per metrik, per kelas).
 
 ## Hasil
@@ -257,3 +257,4 @@ Detail prinsip kerja tiap mekanisme:
 - **PCOS-XAI Ultrasound Dataset** - 11.784 gambar mentah (6.784 PCOS, 5.000 sehat)
 - Deduplikasi md5 otomatis sebelum split: 3.996 gambar unik (3.184 PCOS, 812 sehat; rasio kelas 4:1, laporkan specificity/F1/AUC bersama akurasi)
 - Source: [Kaggle](https://www.kaggle.com/datasets/ibadeus/pcos-xai-ultrasound-dataset)
+- Tahapan lengkap dari pengambilan data sampai artefak (termasuk verifikasi data dan checklist Colab): [references/tahapan-penelitian.md](references/tahapan-penelitian.md)

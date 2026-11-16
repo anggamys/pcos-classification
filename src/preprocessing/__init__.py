@@ -2,12 +2,14 @@
 
 from src.preprocessing.quality import enhance, enhance_clahe, psnr, ssim, summarize
 from src.preprocessing.segmentation import (
+    SEGMENT_WORK_SIZE,
     analyze_regions,
     apply_masked,
     apply_roi_crop,
     overlay_mask,
     segment,
     segment_adaptive,
+    segment_at_scale,
     segment_otsu,
     union_bounding_box,
 )
@@ -18,6 +20,7 @@ from src.preprocessing.wavelet import (
 )
 
 __all__ = [
+    "SEGMENT_WORK_SIZE",
     "analyze_regions",
     "apply_masked",
     "apply_roi_crop",
@@ -29,6 +32,7 @@ __all__ = [
     "psnr",
     "segment",
     "segment_adaptive",
+    "segment_at_scale",
     "segment_otsu",
     "ssim",
     "summarize",

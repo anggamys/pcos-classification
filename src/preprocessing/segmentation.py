@@ -235,16 +235,19 @@ def segment_adaptive(
     return cleanup_mask(dark_pixels, open_radius, close_radius, min_area)
 
 
-def segment(pil_image: Image.Image, method: str = "otsu", **kwargs) -> np.ndarray:
-    """Dispatcher segmentasi kandidat folikel.
+SEGMENT_WORK_SIZE = 224
+
+
+def _segment_raw(pil_image: Image.Image, method: str = "otsu", **kwargs) -> np.ndarray:
+    """Segmentasi pada citra apa adanya, tanpa penyeragaman skala.
 
     Args:
         pil_image (PIL.Image.Image): Citra masukan.
-        method (str): "none" (mask kosong), "otsu", atau "adaptive".
-        **kwargs: Parameter lanjutan diteruskan ke fungsi metode terpilih.
+        method (str): "none", "otsu", atau "adaptive".
+        **kwargs: Parameter lanjutan untuk metode terpilih.
 
     Returns:
-        numpy.ndarray: Mask boolean kandidat folikel.
+        numpy.ndarray: Mask boolean seukuran citra masukan.
 
     Raises:
         ValueError: Jika nama metode tidak dikenal.
@@ -260,6 +263,85 @@ def segment(pil_image: Image.Image, method: str = "otsu", **kwargs) -> np.ndarra
         return segment_adaptive(pil_image, **kwargs)
 
     raise ValueError(f"Unknown segmentation method: {method}")
+
+
+def segment_at_scale(
+    pil_image: Image.Image,
+    method: str = "otsu",
+    size: int = SEGMENT_WORK_SIZE,
+    **kwargs,
+) -> np.ndarray:
+    """Segmentasi pada skala kerja tetap, mask berukuran `size` x `size`.
+
+    Parameter piksel (radius morfologi, min_area) menjadi setara antar citra
+    yang resolusinya berbeda. Dipakai evaluasi kualitas agar coverage dan
+    luas region sebanding.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        method (str): "none", "otsu", atau "adaptive".
+        size (int): Sisi citra kerja persegi (default 224).
+        **kwargs: Parameter lanjutan untuk metode terpilih.
+
+    Returns:
+        numpy.ndarray: Mask boolean berukuran (size, size).
+    """
+    if pil_image.size != (size, size):
+        pil_image = pil_image.resize((size, size), Image.Resampling.BILINEAR)
+
+    return _segment_raw(pil_image, method=method, **kwargs)
+
+
+def _upscale_mask(mask: np.ndarray, size: tuple[int, int]) -> np.ndarray:
+    """Perbesar mask boolean ke ukuran asli dengan nearest-neighbor.
+
+    Args:
+        mask (numpy.ndarray): Mask boolean.
+        size (tuple): Ukuran tujuan (lebar, tinggi).
+
+    Returns:
+        numpy.ndarray: Mask boolean berukuran tujuan.
+    """
+    if mask.shape == (size[1], size[0]):
+        return mask
+
+    upscaled = Image.fromarray(mask.astype(np.uint8) * 255)
+    upscaled = upscaled.resize(size, Image.Resampling.NEAREST)
+
+    return np.asarray(upscaled) > 127
+
+
+def segment(
+    pil_image: Image.Image,
+    method: str = "otsu",
+    work_size: int = SEGMENT_WORK_SIZE,
+    **kwargs,
+) -> np.ndarray:
+    """Dispatcher segmentasi kandidat folikel pada skala kerja tetap.
+
+    Mask dihitung pada citra kerja `work_size` x `work_size` agar ambang
+    piksel konsisten antar resolusi, lalu di-upscale nearest ke ukuran asli
+    supaya bisa dipakai untuk crop ROI atau masking.
+
+    Args:
+        pil_image (PIL.Image.Image): Citra masukan.
+        method (str): "none" (mask kosong), "otsu", atau "adaptive".
+        work_size (int): Sisi citra kerja persegi (default 224).
+        **kwargs: Parameter lanjutan diteruskan ke fungsi metode terpilih.
+
+    Returns:
+        numpy.ndarray: Mask boolean seukuran citra masukan.
+
+    Raises:
+        ValueError: Jika nama metode tidak dikenal.
+    """
+    if method == "none":
+        arr = to_grayscale_array(pil_image)
+        return np.zeros(arr.shape, dtype=bool)
+
+    mask = segment_at_scale(pil_image, method=method, size=work_size, **kwargs)
+
+    return _upscale_mask(mask, pil_image.size)
 
 
 def analyze_regions(mask: np.ndarray) -> dict:
@@ -375,13 +457,17 @@ def apply_masked(
 ) -> Image.Image:
     """Pertahankan piksel region, nolkan background (mode input "masked").
 
+    Mask kosong mengembalikan citra asli, bukan citra hitam: segmentasi yang
+    gagal tidak boleh menghapus seluruh sinyal masukan model.
+
     Args:
         pil_image (PIL.Image.Image): Citra masukan.
         mask (numpy.ndarray): Mask boolean kandidat folikel.
         background (int): Nilai piksel background (default 0).
 
     Returns:
-        PIL.Image.Image: Citra dengan background diganti nilai background.
+        PIL.Image.Image: Citra dengan background diganti nilai background,
+            atau citra asli bila mask kosong.
 
     Raises:
         ValueError: Jika ukuran mask tidak sama dengan ukuran citra.
@@ -391,6 +477,9 @@ def apply_masked(
 
     if binary_mask.shape != image_array.shape[:2]:
         raise ValueError("Mask shape does not match image shape")
+
+    if not binary_mask.any():
+        return pil_image
 
     if image_array.ndim == 3:
         binary_mask = binary_mask[:, :, None]

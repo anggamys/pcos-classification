@@ -36,7 +36,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.preprocessing.quality import enhance, psnr, ssim, summarize
-from src.preprocessing.segmentation import analyze_regions, overlay_mask, segment
+from src.preprocessing.segmentation import (
+    SEGMENT_WORK_SIZE,
+    analyze_regions,
+    overlay_mask,
+    segment,
+    segment_at_scale,
+)
 from src.preprocessing.wavelet import wavelet_denoise
 
 CLASSES = ["infected", "noninfected"]
@@ -84,18 +90,23 @@ def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict
 
 
 def process_one(img_path: Path) -> tuple:
-    """Proses satu citra: denoise, enhance, metrik, dan statistik ROI.
+    """Proses satu citra: metrik terpisah, gabungan, dan statistik ROI.
+
+    Metrik denoise dan CLAHE dihitung terpisah terhadap citra asli. Citra
+    gabungan mengikuti urutan training (CLAHE lalu denoise), dan segmentasi
+    dihitung pada skala kerja tetap agar sebanding antar resolusi.
 
     Args:
         img_path (Path): Path file citra.
 
     Returns:
         tuple: (baris metrik quality.csv, citra asli, hasil denoise,
-            hasil enhance) untuk figure.
+            hasil CLAHE, gabungan denoise+CLAHE) untuk figure.
     """
     raw = Image.open(img_path).convert("RGB")
     denoised = wavelet_denoise(raw)
-    enhanced = enhance(denoised, "clahe")
+    enhanced = enhance(raw, "clahe")
+    combined = wavelet_denoise(enhanced)
 
     row: dict[str, Any] = {"file": img_path.name}
     row["psnr_denoise"] = psnr(raw, denoised)
@@ -104,7 +115,7 @@ def process_one(img_path: Path) -> tuple:
     row["ssim_enhanced"] = ssim(raw, enhanced)
 
     for method in SEG_METHODS:
-        mask = segment(enhanced, method=method)
+        mask = segment_at_scale(combined, method=method, size=SEGMENT_WORK_SIZE)
         stats = analyze_regions(mask)
 
         row[f"{method}_regions"] = stats["num_regions"]
@@ -112,33 +123,35 @@ def process_one(img_path: Path) -> tuple:
         row[f"{method}_mean_area"] = round(stats["mean_area"], 1)
         row[f"{method}_max_area"] = round(stats["max_area"], 1)
 
-    return row, raw, denoised, enhanced
+    return row, raw, denoised, enhanced, combined
 
 
 def save_figure(
     raw: Image.Image,
     denoised: Image.Image,
     enhanced: Image.Image,
+    combined: Image.Image,
     save_path: Path,
     n_overlays: int = 1,
 ) -> None:
-    """Simpan figure 4 panel (asli, denoise, enhance, overlay Otsu).
+    """Simpan figure 4 panel (asli, denoise, CLAHE, overlay Otsu).
 
     Args:
         raw (PIL.Image.Image): Citra asli.
-        denoised (PIL.Image.Image): Citra hasil denoise.
-        enhanced (PIL.Image.Image): Citra hasil denoise+CLAHE.
+        denoised (PIL.Image.Image): Citra hasil denoise saja.
+        enhanced (PIL.Image.Image): Citra hasil CLAHE saja.
+        combined (PIL.Image.Image): Citra CLAHE lalu denoise (urutan training).
         save_path (Path): Path PNG tujuan.
         n_overlays (int): Parameter cadangan jumlah overlay (saat ini 1).
     """
-    mask = segment(enhanced, method="otsu")
-    overlay = overlay_mask(enhanced, mask)
+    mask = segment(combined, method="otsu")
+    overlay = overlay_mask(combined, mask)
     fig, axes = plt.subplots(1, 4, figsize=(16, 4))
 
     for ax, img, title in zip(
         axes,
         [raw, denoised, enhanced, overlay],
-        ["Raw", "Denoised", "Denoise+CLAHE", "Otsu overlay"],
+        ["Raw", "Denoised", "CLAHE", "Denoise+CLAHE overlay"],
     ):
         ax.imshow(img)
         ax.set_title(title, fontsize=11)
@@ -170,12 +183,18 @@ def main() -> None:
 
     for cls in CLASSES:
         for i, path in enumerate(picked[cls]):
-            row, raw, denoised, enhanced = process_one(path)
+            row, raw, denoised, enhanced, combined = process_one(path)
             row["class"] = cls
             rows.append(row)
 
             if i < args.figures:
-                save_figure(raw, denoised, enhanced, fig_dir / f"{cls}_{i:02d}.png")
+                save_figure(
+                    raw,
+                    denoised,
+                    enhanced,
+                    combined,
+                    fig_dir / f"{cls}_{i:02d}.png",
+                )
 
             print(f"{cls} {i + 1}/{len(picked[cls])}: {path.name}")
 

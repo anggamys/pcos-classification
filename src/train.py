@@ -10,6 +10,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from src.device import resolve_device
+
 
 def compute_pos_weight(loader: DataLoader) -> float:
     """Hitung pos_weight BCE dari label subset train (n_negatif/n_positif).
@@ -147,8 +149,38 @@ def validate(
     return total_loss / total, correct / total
 
 
+def build_criterion(
+    train_loader: DataLoader,
+    device: torch.device,
+    pos_weight: bool = True,
+) -> tuple[float | None, nn.Module]:
+    """Bangun BCEWithLogitsLoss dengan pos_weight pada device yang sama.
+
+    Args:
+        train_loader (DataLoader): DataLoader training (sumber label).
+        device (torch.device): Device model dan logits.
+        pos_weight (bool): Aktifkan pos_weight dari split train.
+
+    Returns:
+        tuple: (nilai pos_weight atau None, criterion siap pakai).
+    """
+    if not pos_weight:
+        return None, nn.BCEWithLogitsLoss()
+
+    value = compute_pos_weight(train_loader)
+    criterion = nn.BCEWithLogitsLoss(
+        pos_weight=torch.tensor([value], dtype=torch.float32, device=device)
+    )
+
+    return value, criterion
+
+
 def train(
-    model: nn.Module, train_loader: DataLoader, val_loader: DataLoader, config: dict
+    model: nn.Module,
+    train_loader: DataLoader,
+    val_loader: DataLoader,
+    config: dict,
+    device: torch.device | None = None,
 ) -> dict:
     """Loop pelatihan: Adam + ReduceLROnPlateau + early stopping.
 
@@ -160,12 +192,16 @@ def train(
         train_loader (DataLoader): DataLoader training.
         val_loader (DataLoader): DataLoader validasi.
         config (dict): Berisi epochs, lr, weight_decay, patience,
-            batch_size, dan save_dir.
+            batch_size, save_dir, dan preferensi device.
+        device (torch.device | None): Device yang sudah dipilih pemanggil.
+            Bila None, dipilih dari config["device"] dengan GPU sebagai
+            prioritas default.
 
     Returns:
         dict: History train_loss, train_acc, val_loss, val_acc per epoch.
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device is None:
+        device = resolve_device(config.get("device", "auto"))
 
     if device.type == "cuda":
         torch.backends.cudnn.benchmark = True
@@ -179,19 +215,17 @@ def train(
     # Loss berbobot untuk ketimpangan kelas pasca-dedup (pos_weight = ratio
     # n_negatif/n_positif SPLIT TRAIN, tanpa kebocoran val/test). Nilai yang
     # benar-benar dipakai ikut tersimpan di checkpoint dan run_summary.json.
-    if config.get("pos_weight", True):
-        pos_weight_value = compute_pos_weight(train_loader)
-        criterion = nn.BCEWithLogitsLoss(
-            pos_weight=torch.tensor([pos_weight_value], dtype=torch.float32)
-        )
+    pos_weight_value, criterion = build_criterion(
+        train_loader, device, pos_weight=config.get("pos_weight", True)
+    )
+
+    if pos_weight_value is None:
+        print("Loss: BCEWithLogitsLoss (tanpa pos_weight)")
+    else:
         print(
             f"Loss: BCEWithLogitsLoss + pos_weight={pos_weight_value:.4f} "
             "(rasio n_negatif/n_positif split train)"
         )
-    else:
-        pos_weight_value = None
-        criterion = nn.BCEWithLogitsLoss()
-        print("Loss: BCEWithLogitsLoss (tanpa pos_weight)")
 
     optimizer = Adam(
         model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"]

@@ -90,6 +90,10 @@ def save_run_summary(
         "git_commit": get_git_commit(),
         "environment": {
             "device": device.type,
+            "device_requested": config.get("device", "auto"),
+            "cuda_available": torch.cuda.is_available(),
+            "cuda_version": torch.version.cuda,
+            "amp": device.type == "cuda",
             "gpu_name": torch.cuda.get_device_name(0)
             if device.type == "cuda"
             else None,

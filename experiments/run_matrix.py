@@ -58,6 +58,7 @@ MAIN_FLAGS = [
     ("--segment", "segment"),
     ("--input-mode", "input_mode"),
     ("--gradcam-samples", "gradcam_samples"),
+    ("--device", "device"),
 ]
 
 METRIC_RE = {
@@ -166,6 +167,7 @@ def stream_subprocess(cmd: list, log_path: Path) -> tuple[int, str]:
     """
     chunks: list[str] = []
     interrupted = False
+    returncode = -1
 
     with subprocess.Popen(
         cmd,
@@ -178,7 +180,7 @@ def stream_subprocess(cmd: list, log_path: Path) -> tuple[int, str]:
 
         try:
             while True:
-                raw = proc.stdout.read1(4096)
+                raw = proc.stdout.read(4096)
 
                 if not raw:
                     break

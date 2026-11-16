@@ -10,6 +10,7 @@ import torch
 
 from src.cli import build_config, parse_args
 from src.dataset import create_dataloaders
+from src.device import resolve_device
 from src.evaluate import (
     compute_metrics,
     evaluate_model,
@@ -118,17 +119,16 @@ def main() -> None:
     config = build_config(args)
 
     Path(args.save_dir).mkdir(parents=True, exist_ok=True)
-    log_file = open(Path(args.save_dir) / "training.log", "a", encoding="utf-8")
-    original_stdout, original_stderr = sys.stdout, sys.stderr
-    sys.stdout = _Tee(sys.stdout, log_file)
-    sys.stderr = _Tee(sys.stderr, log_file)
+    with open(Path(args.save_dir) / "training.log", "a", encoding="utf-8") as log_file:
+        original_stdout, original_stderr = sys.stdout, sys.stderr
+        sys.stdout = _Tee(sys.stdout, log_file)
+        sys.stderr = _Tee(sys.stderr, log_file)
 
-    try:
-        _run_pipeline(args, config)
-    finally:
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
-        log_file.close()
+        try:
+            _run_pipeline(args, config)
+        finally:
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
 
 
 def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
@@ -142,6 +142,14 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
 
     print_config(config, args)
     print_gpu_info()
+
+    device = resolve_device(args.device)
+
+    if device.type == "cpu" and args.device == "auto":
+        print(
+            "CUDA tidak tersedia; memakai CPU. Di Colab pilih "
+            "Runtime > Change runtime type > T4 GPU."
+        )
 
     print("Loading dataset...")
 
@@ -175,8 +183,6 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
     if dedup_stats:
         dataset_sizes["duplicates_removed"] = dedup_stats["removed"]
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     print(f"Initializing densenet121 with {args.attention} attention...")
 
     model = get_model(
@@ -194,7 +200,7 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
     model_info = {"total_params": total_params, "trainable_params": trainable_params}
     print("Starting training...")
 
-    history = train(model, train_loader, val_loader, config)
+    history = train(model, train_loader, val_loader, config, device=device)
 
     plot_training_history(history, save_path=f"{args.save_dir}/training_history.png")
 

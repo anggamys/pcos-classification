@@ -100,6 +100,14 @@ def parse_args() -> argparse.Namespace:
         help="Nonaktifkan pos_weight BCE (default: aktif, rasio "
         "n_negatif/n_positif split train untuk ketimpangan kelas pasca-dedup)",
     )
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cuda", "cpu"],
+        help="Device komputasi: auto (GPU bila tersedia, default), cuda "
+        "(wajib GPU), atau cpu",
+    )
 
     parser.add_argument(
         "--attention",
@@ -151,6 +159,7 @@ def build_config(args: argparse.Namespace) -> dict:
         "seed": args.seed,
         "dedupe": not args.no_dedupe,
         "pos_weight": not args.no_pos_weight,
+        "device": args.device,
         "num_workers": args.num_workers,
         "gradcam": args.gradcam,
         "gradcam_samples": args.gradcam_samples,

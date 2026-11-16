@@ -10,6 +10,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import cast
 
 import torch
 from torch import nn
@@ -17,7 +18,7 @@ from torch.utils.data import DataLoader, Dataset, TensorDataset
 
 from src.dataset import TransformedSubset
 from src.run_summary import SUMMARY_METRICS, save_run_summary
-from src.train import compute_pos_weight, train
+from src.train import build_criterion, compute_pos_weight, train
 
 
 class _TinyNet(nn.Module):
@@ -77,6 +78,42 @@ class ComputePosWeightTests(unittest.TestCase):
         labels = torch.zeros(6)
         with self.assertRaises(ValueError):
             compute_pos_weight(DataLoader(TensorDataset(features, labels)))
+
+
+class BuildCriterionTests(unittest.TestCase):
+    """Regresi device: pos_weight wajib ikut device model dan logits."""
+
+    def setUp(self) -> None:
+        features = torch.randn(12, 4)
+        labels = torch.tensor([0.0] * 9 + [1.0] * 3)
+        self.loader = DataLoader(TensorDataset(features, labels))
+
+    def test_pos_weight_follows_requested_device(self) -> None:
+        value, criterion = build_criterion(self.loader, torch.device("meta"))
+
+        self.assertIsNotNone(value)
+        self.assertAlmostEqual(cast(float, value), 3.0)
+        self.assertIsNotNone(criterion.pos_weight)
+        self.assertEqual(criterion.pos_weight.device.type, "meta")
+
+        logits = torch.empty(2, device="meta")
+        target = torch.empty(2, device="meta")
+        loss = criterion(logits, target)
+        self.assertEqual(loss.device.type, "meta")
+
+    def test_disabled_returns_plain_criterion(self) -> None:
+        value, criterion = build_criterion(
+            self.loader, torch.device("cpu"), pos_weight=False
+        )
+
+        self.assertIsNone(value)
+        self.assertIsNone(criterion.pos_weight)
+
+    def test_value_matches_compute_pos_weight(self) -> None:
+        value, _ = build_criterion(self.loader, torch.device("cpu"))
+
+        self.assertIsNotNone(value)
+        self.assertAlmostEqual(cast(float, value), compute_pos_weight(self.loader))
 
 
 class TrainPosWeightIntegrationTests(unittest.TestCase):

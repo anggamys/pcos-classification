@@ -23,6 +23,9 @@ defaults:
   # BCE pos_weight = n_negatif/n_positif split train: menyeimbangkan gradien
   # ketimpangan 4:1 pasca-dedup tanpa resampling. Sama untuk semua eksperimen.
   pos_weight: true
+  # auto: pakai GPU bila tersedia (Colab T4), fallback CPU di lokal.
+  # Set cuda untuk memaksa GPU dan gagal cepat bila runtime tidak punya GPU.
+  device: auto
   out_dir: experiments/results
 
 experiments:

@@ -262,7 +262,7 @@ def print_report(results: dict) -> None:
         results (dict): Keluaran `evaluate_model` (memakai labels dan
             predictions).
     """
-    print("\nCLASSIFICATION REPORT")
+    print("CLASSIFICATION REPORT")
     print(
         classification_report(
             results["labels"],

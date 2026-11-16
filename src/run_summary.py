@@ -123,4 +123,4 @@ def save_run_summary(
     output_path = Path(save_dir) / "run_summary.json"
     output_path.write_text(json.dumps(summary, indent=2))
 
-    print(f"\nRun summary saved to {output_path}")
+    print(f"Run summary saved to {output_path}")

@@ -177,7 +177,7 @@ def main() -> None:
             if i < args.figures:
                 save_figure(raw, denoised, enhanced, fig_dir / f"{cls}_{i:02d}.png")
 
-            print(f"[{cls} {i + 1}/{len(picked[cls])}] {path.name}")
+            print(f"{cls} {i + 1}/{len(picked[cls])}: {path.name}")
 
     # Per-image CSV
     csv_path = out_root / "quality.csv"
@@ -192,7 +192,7 @@ def main() -> None:
 
     for cls in CLASSES + ["all"]:
         subset = [r for r in rows if cls == "all" or r["class"] == cls]
-        lines.append(f"== {cls} (n={len(subset)}) ==")
+        lines.append(f"{cls} (n={len(subset)})")
         structured["classes"][cls] = {"n": len(subset), "metrics": {}}
 
         for key in rows[0]:
@@ -201,7 +201,7 @@ def main() -> None:
 
             s = summarize([r[key] for r in subset])
             lines.append(
-                f"  {key}: mean={s['mean']:.4f} std={s['std']:.4f} "
+                f"{key}: mean={s['mean']:.4f} std={s['std']:.4f} "
                 f"min={s['min']:.4f} max={s['max']:.4f}"
             )
 
@@ -211,8 +211,8 @@ def main() -> None:
     (out_root / "summary.txt").write_text(summary)
     (out_root / "summary.json").write_text(json.dumps(structured, indent=2))
 
-    print("\n" + summary)
-    print(f"\nSaved {csv_path}")
+    print(summary)
+    print(f"Saved {csv_path}")
 
 
 if __name__ == "__main__":

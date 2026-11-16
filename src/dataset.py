@@ -111,8 +111,8 @@ class PCOSDataset(Dataset):
             "removed": raw - len(unique),
         }
         print(
-            f"Dedup md5: {raw} citra mentah -> {len(unique)} unik "
-            f"({raw - len(unique)} salinan identik dibuang)"
+            f"Dedup md5: {raw} citra mentah, {len(unique)} unik, "
+            f"{raw - len(unique)} salinan identik dibuang"
         )
 
     def __len__(self) -> int:
@@ -307,7 +307,7 @@ def create_dataloaders(
 
     if min(train_size, val_size, total - train_size - val_size) < 1:
         raise ValueError(
-            f"Dataset terlalu kecil untuk split ini: total={total} -> "
+            f"Dataset terlalu kecil untuk split ini: total={total}, "
             f"train={train_size}, val={val_size}, "
             f"test={total - train_size - val_size}. "
             "Kurangi rasio atau tambahkan data."

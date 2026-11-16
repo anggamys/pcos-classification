@@ -90,12 +90,11 @@ def print_config(config: dict, args: argparse.Namespace) -> None:
     print("Config:")
 
     for key, value in config.items():
-        print(f"  {key}: {value}")
+        print(f"{key}: {value}")
 
-    print("  model: densenet121")
-    print(f"  attention: {args.attention}")
-    print(f"  dropout: {args.dropout}")
-    print()
+    print("model: densenet121")
+    print(f"attention: {args.attention}")
+    print(f"dropout: {args.dropout}")
 
 
 def print_gpu_info() -> None:
@@ -105,8 +104,7 @@ def print_gpu_info() -> None:
         total_mem = torch.cuda.get_device_properties(0).total_memory / 1024**3
 
         print(f"GPU: {gpu_name}")
-        print(f"VRAM: {total_mem:.1f} GB | AMP: enabled (float16)")
-        print()
+        print(f"VRAM: {total_mem:.1f} GB, AMP: enabled (float16)")
 
 
 def main() -> None:
@@ -162,8 +160,8 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
     )
 
     print(f"Train: {len(cast(Sized, train_loader.dataset))}")
-    print(f"Val:   {len(cast(Sized, val_loader.dataset))}")
-    print(f"Test:  {len(cast(Sized, test_loader.dataset))}")
+    print(f"Val: {len(cast(Sized, val_loader.dataset))}")
+    print(f"Test: {len(cast(Sized, test_loader.dataset))}")
 
     dataset_sizes = {
         "train": len(cast(Sized, train_loader.dataset)),
@@ -179,7 +177,7 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print(f"\nInitializing densenet121 with {args.attention} attention...")
+    print(f"Initializing densenet121 with {args.attention} attention...")
 
     model = get_model(
         pretrained=not args.no_pretrained,
@@ -190,32 +188,32 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
-    print(f"Total params:     {total_params:,}")
+    print(f"Total params: {total_params:,}")
     print(f"Trainable params: {trainable_params:,}")
 
     model_info = {"total_params": total_params, "trainable_params": trainable_params}
-    print("\nStarting training...")
+    print("Starting training...")
 
     history = train(model, train_loader, val_loader, config)
 
     plot_training_history(history, save_path=f"{args.save_dir}/training_history.png")
 
-    print("\nLoading best model for evaluation...")
+    print("Loading best model for evaluation...")
 
     checkpoint = torch.load(f"{args.save_dir}/best_model.pth", weights_only=True)
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
 
-    print("\nEvaluating on test set...")
+    print("Evaluating on test set...")
     results = evaluate_model(model, test_loader, device)
     metrics = compute_metrics(results)
 
-    print(f"\nAccuracy:    {metrics['accuracy']:.4f}")
-    print(f"Precision:   {metrics['precision']:.4f}")
-    print(f"Recall:      {metrics['recall']:.4f}")
-    print(f"F1-Score:    {metrics['f1']:.4f}")
+    print(f"Accuracy: {metrics['accuracy']:.4f}")
+    print(f"Precision: {metrics['precision']:.4f}")
+    print(f"Recall: {metrics['recall']:.4f}")
+    print(f"F1-Score: {metrics['f1']:.4f}")
     print(f"Specificity: {metrics['specificity']:.4f}")
-    print(f"AUC:         {metrics['auc']:.4f}")
+    print(f"AUC: {metrics['auc']:.4f}")
 
     print_report(results)
 
@@ -233,7 +231,7 @@ def _run_pipeline(args: argparse.Namespace, config: dict) -> None:
     )
 
     if args.gradcam:
-        print("\nGenerating Grad-CAM visualization...")
+        print("Generating Grad-CAM visualization...")
 
         visualize_gradcam(
             model,

@@ -251,7 +251,102 @@ metrik (`experiments/results/results.csv`, termasuk `total_params` dan
 dihasilkan tanpa training oleh `experiments/evaluate_quality.py` ke
 `experiments/quality/` (`quality.csv`, `summary.txt`, figure overlay).
 
-### 4.3. Metrik dan keluaran per sudut matakuliah
+### 4.3. Hasil eksperimen dan pembacaan hipotesis
+
+Seluruh E1-E6 selesai pada commit `70e0de3` (Colab T4, AMP float16, 30 epoch
+maksimum, early stopping patience 10, test 600 citra). Angka lengkap ada di
+`experiments/results/results.csv`; verdict dihasilkan
+`matrix_summary.json` dengan kriteria yang sudah ditetapkan sebelum run.
+
+| ID  | Accuracy | Precision | Recall | F1     | Specificity | AUC    |
+| --- | -------- | --------- | ------ | ------ | ----------- | ------ |
+| E1  | 98.17%   | 99.58%    | 98.12% | 98.84% | 98.35%      | 99.65% |
+| E2  | 94.67%   | 100.0%    | 93.32% | 96.54% | 100.0%      | 99.70% |
+| E3  | 96.00%   | 99.78%    | 95.20% | 97.44% | 99.17%      | 99.56% |
+| E4  | 95.00%   | 100.0%    | 93.74% | 96.77% | 100.0%      | 99.74% |
+| E5  | 99.17%   | 99.58%    | 99.37% | 99.48% | 98.35%      | 99.72% |
+| E6  | 96.00%   | 99.78%    | 95.20% | 97.44% | 99.17%      | 99.55% |
+
+Catatan metodologis dari history per-epoch: early stopping terjadi pada epoch
+12-22, sedangkan model terbaik dipilih pada epoch 2-12. Val loss berfluktuasi
+cukup besar antar epoch (mis. E3 dari 0,0320 ke 0,1232 lalu 0,0355). Dengan
+satu seed, epoch terbaik karena itu mengandung unsur keberuntungan dan tidak
+boleh ditafsirkan sebagai konvergensi stabil.
+
+**H1 tidak diterima.** E2 menurunkan accuracy 3,50 poin dan recall 4,80 poin
+dibanding E1. AUC memang naik tipis 0,05 poin (0,9970 vs 0,9965), tetapi
+regresi accuracy melewati toleransi 0,5 poin yang disepakati. PSNR/SSIM
+denoise yang tinggi (51,21 dB; SSIM 0,9963) hanya menunjukkan citra berubah
+sedikit, bukan bahwa noise hilang lebih baik, karena tidak ada citra bersih
+sebagai ground truth. BayesShrink pada implementasi ini konservatif dan tidak
+memberi manfaat klasifikasi yang terukur.
+
+**H2 tidak diterima untuk varian utama E4.** AUC E4 lebih tinggi 0,18 poin
+dari E3, tetapi F1 turun 0,67 poin (96,77% vs 97,44%) sehingga melewati
+toleransi 0,5 poin. E5 (masked) mencapai hasil terbaik secara deskriptif
+(accuracy 99,17%, F1 99,48%, 3 false negative dan 2 false positive), tetapi
+E5 tidak boleh dipakai untuk menyelamatkan verdict H2 karena varian utama
+sudah diprespesifikasi sebagai E4; memilih E5 setelah melihat test set akan
+menjadi seleksi post-hoc. Sinyal E5 tetap layak dilaporkan sebagai temuan
+sekunder yang perlu diuji ulang, bukan klaim.
+
+**H3 tidak diterima.** Accuracy E6 setara dalam toleransi (96,00% vs 95,00%)
+dan AUC hanya turun 0,20 poin (99,55% vs 99,74%), sementara parameter turun
+35,6% (7,35 juta vs 11,42 juta). Namun latency CPU E6 110,07 ms sedikit lebih
+besar dari E4 108,73 ms, sehingga kriteria "latency tidak lebih besar" tidak
+terpenuhi. Selisih 1,34 ms berada di bawah rentang pengukuran: latency
+self-attention pada E1-E5 (arsitektur sama) bergerak dari 117,41 ke 108,20 ms,
+jadi 9,2 ms. E6 diukur paling akhir sehingga arah "CBAM tidak lebih cepat"
+masih mungkin benar, tetapi besarnya tidak dapat dipisahkan dari noise
+pengukuran. Kriteria prespecified tidak diubah setelah melihat hasil; klaim
+latency dilaporkan sebagai indikatif, bukan bukti kuat.
+
+**Audit near-duplicate setelah run.** Dedup md5 hanya membuang salinan
+byte-identik (7.788 dari 11.784 file). Dengan kemiripan 64x64 grayscale
+(korelasi >= 0,995), 57 dari 600 citra test punya near-duplicate di train,
+atau 68 bila val ikut dihitung; 11 di antaranya berlabel berlawanan. Di seluruh
+dataset, 34 dari 812 citra noninfected unik (4,2%) near-identik (>= 0,9997)
+dengan citra infected. Setelah 68 citra test tersebut dikeluarkan, accuracy
+menjadi 98,87% (E1), 99,44% (E5), dan 96,62% (E3/E6), sehingga verdict tidak
+berubah. Citra near-duplicate berlabel sama diprediksi benar 56/56 oleh E1, E3,
+E5, dan E6 (empat model yang diperiksa), sedangkan yang berlabel konflik
+menjadi sumber error. Kebocoran ini
+karena itu tidak menggelembungkan accuracy agregat, tetapi label noise 4,2%
+pada kelas noninfected tetap menjadi batasan validitas.
+
+**ROI dan mask.** Bounding box gabungan region Otsu mencakup lebih dari 95%
+frame pada 492 dari 600 citra test (median 100%), sehingga crop ROI praktis
+tidak memotong; hanya 3 citra yang crop-nya di bawah 5% frame lalu di-upscale
+sekitar 8x. Ini menjelaskan mengapa E4 hampir setara E3. Mask kosong terjadi
+pada 24/600 citra test dan coverage di bawah 5% pada 44/600. E5 tetap benar
+44/44 pada subset coverage rendah, dan kelima error E5 berada pada coverage
+normal, sehingga mask degeneratif bukan penyebab error. Tidak ada guard
+coverage minimum; guard itu sengaja tidak ditambahkan setelah melihat hasil
+karena akan mengubah definisi E4-E6 dan memerlukan rerun.
+
+**Grad-CAM.** Model biner satu logit membuat implementasi lama selalu
+menargetkan logit PCOS. Prediksi Normal karena itu menghasilkan heatmap kosong
+setelah ReLU: 3 dari 12 prediksi Normal pada 60 citra test pertama E1, dan
+baris Normal pada figure E6 kosong total. Panel tersebut bukan bukti ketiadaan
+sinyal. Kode sekarang memakai -logit untuk prediksi Normal, tetapi figure di
+`experiments/results/` masih dihasilkan versi lama dan perlu diregenerasi dari
+checkpoint.
+
+**Pembacaan klinis.** Pada test set dengan 479 infected dan 121 noninfected,
+accuracy didominasi kelas mayoritas. Untuk skrining, false negative lebih
+berbahaya: E5 menghasilkan 3 false negative, E1 9, E3/E6 23, dan E2/E4 30-32.
+Pola ini menjelaskan mengapa E1 unggul pada accuracy tetapi E5 lebih baik pada
+recall dan F1. Karena perbedaan tersebut hanya dari satu split dan satu seed,
+temuan ini belum cukup untuk menyimpulkan bahwa masked input lebih unggul.
+
+**Bukti PCD.** PSNR denoise 51,21 dB dan SSIM 0,9963; PSNR CLAHE 17,32 dB dan
+SSIM 0,7561. Otsu menghasilkan mask kosong 8/200 (4,0%). Coverage Otsu berbeda
+antar kelas (0,285 infected vs 0,385 noninfected), sedangkan adaptive
+berlawanan arah (0,352 vs 0,279); cacah region tidak berbeda berarti. Arah yang
+tidak konsisten ini menegaskan deskriptor region belum dapat dipakai sebagai
+penanda diagnostik PCOS.
+
+### 4.4. Metrik dan keluaran per sudut matakuliah
 
 - **Pengolahan Citra Digital (H1 + metode H2):** PSNR/SSIM, histogram/spektrum,
   overlay mask, statistik ROI (jumlah region, coverage, luas rata-rata dan
@@ -263,23 +358,39 @@ dihasilkan tanpa training oleh `experiments/evaluate_quality.py` ke
 - Pendahuluan, dataset, dan pipeline boleh sama untuk kedua laporan; sudut
   analisis dan kesimpulan dibedakan per matakuliah.
 
-### 4.4. Batasan yang dinyatakan sejak awal
+### 4.5. Batasan yang dinyatakan sejak awal
 
 1. Dataset tidak menyediakan mask ground truth → segmentasi bersifat
    unsupervised/pendukung ROI (statistik region + overlay kualitatif, bukan
    Dice klinis).
 2. Satu split train/val/test → perbandingan metrik bersifat deskriptif, tanpa
    klaim signifikansi statistik.
-3. Split dilakukan pada level citra, bukan level pasien/video: deduplikasi
-   hanya membuang salinan byte-identik, sementara frame berurutan dari video
-   USG yang sama bisa nyaris identik tetapi tak terdeteksi hash. Jika metadata
-   pasien tersedia, split level pasien adalah perbaikan lanjutan yang
-   disarankan.
+3. Split dilakukan pada level citra, bukan level pasien/video. Deduplikasi md5
+   hanya membuang salinan byte-identik (7.788 dari 11.784 file); audit
+   kemiripan 64x64 menemukan 57/600 citra test yang punya near-duplicate di
+   train (68 dengan val), 11 di antaranya berlabel berlawanan, serta 34/812
+   citra noninfected unik yang near-identik dengan citra infected. Setelah 68
+   citra test tersebut dikeluarkan, accuracy E1/E5/E3-E6 berubah dari
+   98,17/99,17/96,00 menjadi 98,87/99,44/96,62 dan verdict tidak berubah. Split
+   level pasien tetap perbaikan lanjutan yang disarankan.
 4. Setiap eksperimen dijalankan sekali dengan satu seed (42). Variasi antar
    seed tidak diukur, dan toleransi verdict 0,005 berada di dekat rentang
    noise run-to-run; replikasi multi-seed disarankan bila kuota Colab
-   memungkinkan.
-5. Fusi multimodal (G1), validasi antar dataset (G2), dan kuantifikasi
+   memungkinkan. Latency CPU juga diukur 20 forward berurutan dalam satu proses
+   tanpa penguncian thread; rentang antar run self-attention 108,20-117,41 ms
+   lebih besar dari selisih E6-E4 (1,34 ms), sehingga klaim latency H3
+   indikatif.
+5. ROI Otsu memakai bounding box gabungan semua region. Pada 492/600 citra test
+   kotak itu mencakup lebih dari 95% frame, sehingga crop praktis tidak
+   memotong; 3 citra justru di-crop di bawah 5% frame lalu di-upscale. Mask
+   kosong (24/600) dikembalikan sebagai citra asli, tetapi mask dengan coverage
+   sangat kecil tetap dipakai dan menghasilkan input nyaris hitam pada mode
+   masked.
+6. Grad-CAM menjelaskan kelas prediksi; pada model satu logit, prediksi Normal
+   dijelaskan lewat -logit. Figure Grad-CAM di `experiments/results/`
+   dihasilkan sebelum perbaikan ini, sehingga panel Normal pada figure lama
+   kosong dan tidak boleh ditafsirkan sebagai tidak adanya bukti.
+7. Fusi multimodal (G1), validasi antar dataset (G2), dan kuantifikasi
    ketidakpastian (G3) di luar scope dan dicatat sebagai saran lanjutan.
 
 ---

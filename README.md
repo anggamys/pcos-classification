@@ -236,18 +236,68 @@ Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, `training.log`, dan ri
 | Specificity | 100.0% | -       |
 | AUC         | 100.0% | 99.97%  |
 
-### Matriks Eksperimen E1-E6 (diisi dari `experiments/results/results.csv`)
+### Matriks Eksperimen E1-E6
 
-> Status: menunggu training di Colab
+Hasil valid dari run Colab T4 pada commit `70e0de3`, 30 epoch maksimum dengan
+early stopping patience 10, split test 600 citra. Sumber angka:
+`experiments/results/results.csv` dan `experiments/results/matrix_summary.json`.
 
-| ID  | Accuracy | F1  | AUC | Catatan       |
-| --- | -------- | --- | --- | ------------- |
-| E1  | -        | -   | -   | Baseline      |
-| E2  | -        | -   | -   | + BayesShrink |
-| E3  | -        | -   | -   | + CLAHE       |
-| E4  | -        | -   | -   | + ROI Otsu    |
-| E5  | -        | -   | -   | + Masked Otsu |
-| E6  | -        | -   | -   | + CBAM        |
+| ID  | Accuracy | Precision | Recall | F1     | Specificity | AUC    |
+| --- | -------- | --------- | ------ | ------ | ----------- | ------ |
+| E1  | 98.17%   | 99.58%    | 98.12% | 98.84% | 98.35%      | 99.65% |
+| E2  | 94.67%   | 100.0%    | 93.32% | 96.54% | 100.0%      | 99.70% |
+| E3  | 96.00%   | 99.78%    | 95.20% | 97.44% | 99.17%      | 99.56% |
+| E4  | 95.00%   | 100.0%    | 93.74% | 96.77% | 100.0%      | 99.74% |
+| E5  | 99.17%   | 99.58%    | 99.37% | 99.48% | 98.35%      | 99.72% |
+| E6  | 96.00%   | 99.78%    | 95.20% | 97.44% | 99.17%      | 99.55% |
+
+Parameter dan latency CPU: E1-E5 self-attention 11.416.961 parameter
+(108,2-117,4 ms per forward), E6 CBAM 7.347.683 parameter (110,1 ms).
+
+Verdict deskriptif dari `matrix_summary.json`:
+
+- **H1 tidak diterima.** E2 menurunkan accuracy 3,50 poin dari E1; AUC naik
+  0,05 poin, tetapi regresi accuracy melewati toleransi 0,5 poin.
+- **H2 tidak diterima untuk varian utama E4.** AUC E4 lebih tinggi 0,18 poin
+  dari E3, namun F1 turun 0,67 poin sehingga melewati toleransi 0,5 poin.
+  E5 (masked) hanya deskriptif dan mencapai accuracy 99,17%, F1 99,48%.
+- **H3 tidak diterima.** Accuracy E6 setara dalam toleransi dan parameter
+  turun 35,6%, tetapi latency CPU 110,07 ms sedikit di atas E4 108,73 ms
+  sehingga kriteria "latency tidak lebih besar" tidak terpenuhi. Selisih
+  1,34 ms berada di bawah rentang pengukuran antar run self-attention
+  (108,20-117,41 ms), sehingga klaim latency H3 bersifat indikatif; kriteria
+  prespecified tidak diubah setelah melihat hasil.
+
+Bukti sisi PCD dari `experiments/quality/` (n=100 per kelas): PSNR denoise
+51,21 dB dan SSIM 0,9963; PSNR CLAHE 17,32 dB dan SSIM 0,7561. Segmentasi Otsu
+menghasilkan mask kosong 8/200 (4,0%) dengan coverage 0,335; adaptive coverage
+0,315. Coverage Otsu berbeda antar kelas (0,285 infected vs 0,385
+noninfected), sedangkan adaptive berlawanan arah (0,352 vs 0,279). Arah yang
+tidak konsisten ini menunjukkan deskriptor region belum layak dipakai sebagai
+penanda diagnostik; verdict H2 tetap dari metrik model.
+
+Catatan kode: run di atas memakai commit `70e0de3`. Setelah run, guard
+`sigma <= 0` ditambahkan pada denoise wavelet untuk 4 citra noninfected dengan
+subband HH1 tanpa variasi (lihat `references/tahapan-penelitian.md` bagian 11).
+Prediksi citra test yang terdampak tidak berubah, tetapi rerun E2-E6
+disarankan bila hasil harus sepadan penuh dengan kode di HEAD.
+
+Dua perbaikan lain setelah run tidak mengubah training: detail verdict H3 kini
+mencantumkan angka parameter dan latency, dan Grad-CAM memakai `-logit` untuk
+prediksi Normal pada model satu logit. Figure Grad-CAM di
+`experiments/results/` masih dari versi lama, sehingga panel Normal dapat
+kosong dan perlu diregenerasi dari checkpoint. Checkpoint tidak menyimpan
+config atau tipe attention; muat model memakai `run_summary.json` atau
+`experiments.yml`.
+
+Audit data setelah run: dedup md5 tidak menangkap salinan hasil resize/crop.
+Dengan korelasi 64x64 >= 0,995, 57/600 citra test punya near-duplicate di
+train (68 dengan val), 11 di antaranya berlabel berlawanan; 34/812 citra
+noninfected unik near-identik dengan citra infected. Tanpa 68 citra tersebut,
+accuracy E1/E5/E3-E6 menjadi 98,87/99,44/96,62 dan verdict tidak berubah.
+Bounding box ROI juga mencakup lebih dari 95% frame pada 492/600 citra test,
+sehingga crop ROI sebagian besar tidak memotong. Rincian di
+`references/tahapan-penelitian.md` bagian 11.1 dan 11.2.
 
 ### Perbandingan Attention Mechanisms
 

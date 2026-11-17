@@ -251,5 +251,60 @@ ancaman validitas karena dapat menjadi isyarat palsu bagi model.
 
 Hasil lama (accuracy 99,72%) tidak sah dan tidak boleh dikutip: dibuat sebelum
 deduplikasi dan sebelum perbaikan penempatan attention. Checkpoint lama juga
-tidak kompatibel dengan arsitektur sekarang. Semua angka E1-E6 harus berasal
-dari run baru setelah commit pipeline yang berlaku.
+tidak kompatibel dengan arsitektur sekarang. Semua angka E1-E6 berasal dari run
+baru pada commit `70e0de3` (Colab T4) dan tersimpan di `experiments/results/`.
+
+Setelah run tersebut, ditemukan peringatan `pywt` pada 4 citra noninfected yang
+subband HH1-nya tidak memiliki variasi (sigma noise = 0). Soft threshold
+dengan nilai 0 menghasilkan NaN untuk koefisien nol, lalu NaN diam-diam
+menjadi 0 saat cast ke uint8. Guard `sigma <= 0` ditambahkan agar kanal
+dikembalikan apa adanya. Keempat citra berada di train (3), val (1), dan test
+(1). Pada citra test yang terdampak, probabilitas prediksi E2-E6 berubah kurang
+dari 0,0005 dan kelas prediksi tetap sama, sehingga verdict tidak berubah.
+Rerun E2-E6 tetap disarankan bila hasil harus sepenuhnya sepadan dengan kode
+di HEAD.
+
+### 11.1. Audit near-duplicate dan label noise
+
+Dedup md5 hanya menghapus salinan byte-identik. Untuk mengukur sisa duplikasi,
+seluruh 3.996 citra unik di-thumbnail ke 64x64 grayscale, dinormalisasi, lalu
+dihitung korelasi kosinus antar split. Ambang 1,0 berarti identik dan 0,995
+dipakai sebagai batas near-duplicate; pasangan teratas diverifikasi visual.
+
+- 57/600 citra test punya near-duplicate di train (68 bila val dihitung).
+- 11 citra (12 dengan val) near-identik dengan citra berlabel berlawanan.
+- 34/812 citra noninfected unik (4,2%) near-identik dengan citra infected,
+  semuanya berkorelasi >= 0,9997 dan berpola `Image_*.jpg` lawan `image*.jpg`.
+- Setelah 68 citra test tersebut dikeluarkan, accuracy E1 98,87%, E5 99,44%,
+  E3/E6 96,62%. Verdict H1-H3 tidak berubah.
+- Citra near-duplicate berlabel sama diprediksi benar 56/56 oleh E1, E3, E5,
+  dan E6; pasangan berlabel konflik menjadi sumber error.
+
+Sumber duplikasi juga tidak seimbang: noninfected 5.000 file mentah menjadi
+812 unik (84% duplikat), infected 6.784 menjadi 3.184 unik. Tidak ada grup
+md5 lintas kelas, sehingga rasio 80/20 berasal dari dataset sumber, bukan dari
+urutan keep-first.
+
+### 11.2. Audit ROI, mask, dan Grad-CAM
+
+- Bounding box gabungan region Otsu mencakup lebih dari 95% frame pada
+  492/600 citra test (median 100%). Hanya 3 citra yang crop-nya di bawah 5%
+  frame. Mode ROI karena itu sebagian besar identik dengan citra penuh.
+- Mask test kosong 24/600 dan coverage di bawah 5% pada 44/600. E5 benar 44/44
+  pada subset coverage rendah; kelima error E5 berada pada coverage normal.
+  `segment_otsu` hanya punya fallback untuk coverage terlalu besar
+  (`max_coverage`), belum ada batas coverage minimum.
+- Grad-CAM lama selalu memakai logit PCOS karena model hanya punya satu
+  keluaran. Prediksi Normal menghasilkan gradien negatif yang dipotong ReLU:
+  3/12 prediksi Normal pada 60 citra test pertama E1 menghasilkan CAM kosong.
+  Kode sekarang memakai -logit untuk prediksi Normal; figure lama perlu
+  diregenerasi dari checkpoint.
+- `best_model.pth` tidak menyimpan config, tipe attention, atau pemetaan kelas,
+  hanya `epoch`, `model_state_dict`, `optimizer_state_dict`, `pos_weight`,
+  `val_acc`, dan `val_loss`. Rekonstruksi model tetap memerlukan
+  `run_summary.json` atau `experiments.yml`.
+- Epoch di checkpoint 0-indexed (E1 `epoch=1` untuk `best_epoch=2`), berbeda
+  dari log yang 1-indexed.
+- `results.csv` membulatkan metrik ke 4 desimal; nilainya konsisten dengan
+  `run_summary.json` setelah pembulatan. Verdict H2 dihitung dari nilai bulat
+  itu, tetapi margin 0,0017 masih jauh di atas galat pembulatan.

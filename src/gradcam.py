@@ -45,6 +45,8 @@ class GradCAM:
         Args:
             input_tensor (torch.Tensor): Batch satu citra (1, C, H, W).
             target_class (int atau None): Kelas target; kelas prediksi bila None.
+                Pada model biner satu-logit, prediksi Normal dijelaskan lewat
+                ``-logit`` karena hanya ada satu keluaran positif (PCOS).
 
         Returns:
             numpy.ndarray: Heatmap 2D seukuran citra masukan.
@@ -64,18 +66,27 @@ class GradCAM:
         output = self.model(input_tensor)
 
         if target_class is None:
-            target_class = output.argmax(dim=1).item()
-
-        assert target_class is not None
-        if not 0 <= target_class < output.shape[1]:
-            raise ValueError(
-                f"target_class={target_class} di luar rentang keluaran model "
-                f"(model menghasilkan {output.shape[1]} nilai; model biner "
-                "satu-logit hanya valid untuk 0)"
-            )
+            if output.shape[1] == 1:
+                # Model biner satu-logit: logit positif menjelaskan PCOS dan
+                # logit negatif menjelaskan Normal. Menargetkan logit positif
+                # untuk prediksi Normal menghasilkan gradien negatif yang
+                # dipotong ReLU, sehingga heatmap menjadi kosong.
+                score = output[0, 0]
+                predicted_positive = torch.sigmoid(score).item() > 0.5
+                target_score = score if predicted_positive else -score
+            else:
+                target_score = output[0, output.argmax(dim=1).item()]
+        else:
+            if not 0 <= target_class < output.shape[1]:
+                raise ValueError(
+                    f"target_class={target_class} di luar rentang keluaran model "
+                    f"(model menghasilkan {output.shape[1]} nilai; model biner "
+                    "satu-logit hanya valid untuk 0)"
+                )
+            target_score = output[0, target_class]
 
         self.model.zero_grad()
-        output[0, target_class].backward()
+        target_score.backward()
 
         if self.gradients is None or self.activations is None:
             raise RuntimeError(

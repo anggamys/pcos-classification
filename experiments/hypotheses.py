@@ -140,9 +140,21 @@ def evaluate_hypotheses(rows: list) -> dict:
             and latency_ok
         )
 
+        if cbam_latency is None or self_attention_latency is None:
+            latency_detail = "latency tidak dievaluasi (data tidak tersedia)"
+        else:
+            latency_detail = (
+                f"latency {cbam_latency:.2f} ms vs {self_attention_latency:.2f} ms "
+                "(syarat: tidak lebih besar)"
+            )
+
         verdicts["H3"] = {
             "status": "accepted" if accepted else "not_accepted",
-            "detail": "akurasi/AUC E6 >= E4 - 0.005 dengan parameter lebih sedikit",
+            "detail": (
+                "E6 vs E4: akurasi/AUC >= E4 - 0.005, "
+                f"params {int(cbam['total_params']):,} vs "
+                f"{int(self_attention['total_params']):,}, {latency_detail}"
+            ),
         }
 
     return verdicts

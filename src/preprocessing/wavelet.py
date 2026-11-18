@@ -25,6 +25,13 @@ def bayes_shrink_denoise(
     coeffs = pywt.wavedec2(channel, wavelet, level=level)
     sigma = np.median(np.abs(coeffs[-1][2])) / 0.6745
 
+    # Subband HH1 tanpa variasi (mis. latar hitam seragam) memberi sigma 0.
+    # Threshold 0 adalah identitas, tetapi pywt 1.8 menghasilkan NaN untuk
+    # koefisien nol (0/0) yang lalu diam-diam menjadi 0 saat cast uint8.
+    # Lewati thresholding agar citra tidak berubah dan tidak ada NaN.
+    if not np.isfinite(sigma) or sigma <= 0:
+        return np.asarray(channel, dtype=np.float64).copy()
+
     denoised_coeffs = [coeffs[0]]
     for detail_level in coeffs[1:]:
         denoised_detail = []

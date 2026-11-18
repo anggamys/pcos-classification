@@ -311,6 +311,24 @@ class GradCAMFailurePaths(unittest.TestCase):
         self.assertGreaterEqual(cam.min(), 0.0)
         self.assertLessEqual(cam.max(), 1.0)
 
+    def test_binary_negative_prediction_is_not_blank(self) -> None:
+        # Model satu logit: prediksi Normal harus dijelaskan lewat -logit.
+        # Sebelum perbaikan, backprop logit positif selalu menghasilkan CAM 0.
+        model = _MockBackboneModel().eval()
+        with torch.no_grad():
+            model.denseblock4.weight.fill_(0.1)
+            model.denseblock4.bias.zero_()
+            model.fc.weight.fill_(-1.0)
+            model.fc.bias.zero_()
+        input_tensor = torch.ones(1, 3, 32, 32)
+        with torch.no_grad():
+            self.assertLess(model(input_tensor).item(), 0.0)
+
+        cam = GradCAM(model, model.denseblock4).generate(input_tensor)
+
+        self.assertGreater(cam.max(), 0.0)
+        self.assertEqual(cam.shape, (32, 32))
+
     def test_unused_target_layer_raises(self) -> None:
         unused = torch.nn.Conv2d(3, 4, 1)
         gradcam = GradCAM(self.model, unused)
@@ -466,6 +484,30 @@ class HypothesesFailurePaths(unittest.TestCase):
             ),
         ]
         self.assertEqual(evaluate_hypotheses(rows)["H3"]["status"], "not_accepted")
+
+    def test_h3_detail_reports_params_and_latency(self) -> None:
+        # Detail verdict harus memuat kriteria yang benar-benar dipakai,
+        # termasuk latency, agar status not_accepted dapat diaudit.
+        from experiments.hypotheses import evaluate_hypotheses
+
+        rows = [
+            self.row(
+                "E4",
+                accuracy=0.90,
+                auc=0.93,
+                total_params=11_416_961,
+                infer_ms_cpu=40.0,
+            ),
+            self.row(
+                "E6", accuracy=0.90, auc=0.93, total_params=7_347_683, infer_ms_cpu=60.0
+            ),
+        ]
+        detail = evaluate_hypotheses(rows)["H3"]["detail"]
+        self.assertIn("latency", detail)
+        self.assertIn("60.00 ms", detail)
+        self.assertIn("40.00 ms", detail)
+        self.assertIn("11,416,961", detail)
+        self.assertIn("7,347,683", detail)
 
     def test_h3_equal_metrics_within_tolerance_accepted(self) -> None:
         rows = [

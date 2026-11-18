@@ -19,7 +19,7 @@ _EXPERIMENTS_DIR = Path(__file__).resolve().parent.parent / "experiments"
 if str(_EXPERIMENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_EXPERIMENTS_DIR))
 
-import run_matrix  # noqa: E402
+import run_matrix  # type: ignore[reportMissingImports]
 
 # Child menulis baris pertama, menunggu berkas gate, baru menulis baris kedua
 # dan keluar dengan kode 3. Gate memungkinkan test membuktikan baris pertama
@@ -100,8 +100,7 @@ class StreamSubprocessTests(unittest.TestCase):
             deadline = time.monotonic() + 20
 
             while (
-                "PROGRESS-50%" not in buffer.getvalue()
-                and time.monotonic() < deadline
+                "PROGRESS-50%" not in buffer.getvalue() and time.monotonic() < deadline
             ):
                 time.sleep(0.01)
 
@@ -135,9 +134,7 @@ class StreamSubprocessTests(unittest.TestCase):
         log_path = self.dir / "stdout.log"
 
         with contextlib.redirect_stdout(io.StringIO()):
-            returncode, output = run_matrix.stream_subprocess(
-                self._command(), log_path
-            )
+            returncode, output = run_matrix.stream_subprocess(self._command(), log_path)
 
         self.assertEqual(returncode, 3)
         self.assertTrue(log_path.exists())
@@ -149,9 +146,11 @@ class StreamSubprocessTests(unittest.TestCase):
         log_path = self.dir / "stdout.log"
         stream = _InterruptingStream()
 
-        with mock.patch.object(sys, "stdout", stream):
-            with self.assertRaises(KeyboardInterrupt):
-                run_matrix.stream_subprocess(cmd, log_path)
+        with (
+            mock.patch.object(sys, "stdout", stream),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            run_matrix.stream_subprocess(cmd, log_path)
 
         self.assertIn("BEFORE-INTERRUPT", self._read_log(log_path))
 

@@ -61,13 +61,35 @@ class PCOSDataset(Dataset):
 
         for label, subdir in enumerate(["noninfected", "infected"]):
             subdir_path = self.root_dir / subdir
+
+            if not subdir_path.is_dir():
+                raise FileNotFoundError(
+                    f"Direktori kelas tidak ditemukan: {subdir_path} "
+                    f"(label '{subdir}'). Struktur yang diharapkan: "
+                    "<root>/noninfected dan <root>/infected berisi file .jpg."
+                )
+
             matches = sorted(subdir_path.glob("*.jpg"))
 
             if not matches:
+                found = sorted(p for p in subdir_path.iterdir() if p.is_file())
+                extensions = sorted(
+                    {p.suffix.lower() or "<tanpa ekstensi>" for p in found}
+                )
+
+                if found:
+                    detail = (
+                        f"Ditemukan {len(found)} file lain (ekstensi: "
+                        f"{', '.join(extensions)}; contoh: "
+                        f"{', '.join(p.name for p in found[:3])})."
+                    )
+                else:
+                    detail = "Direktori kosong."
+
                 raise FileNotFoundError(
                     f"Tidak ada citra .jpg di {subdir_path} (label '{subdir}'). "
-                    "Struktur yang diharapkan: <root>/noninfected dan "
-                    "<root>/infected berisi file .jpg."
+                    f"{detail} Glob *.jpg case-sensitive: .JPG dan .png "
+                    "tidak terbaca, jadi periksa juga --data-dir."
                 )
 
             for img_name in matches:

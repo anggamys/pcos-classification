@@ -49,6 +49,44 @@ CLASSES = ["infected", "noninfected"]
 SEG_METHODS = ["otsu", "adaptive"]
 
 
+def describe_data_dir(data_dir: str) -> str:
+    """Ringkas isi direktori dataset untuk pesan error yang diagnostik.
+
+    Args:
+        data_dir (str): Direktori dataset (relatif terhadap root proyek atau absolut).
+
+    Returns:
+        str: Beberapa baris berisi path, cacah *.jpg, ekstensi yang ditemukan,
+            dan contoh nama file per kelas.
+    """
+    root = PROJECT_ROOT / data_dir
+    lines = [f"Direktori dataset: {root}"]
+
+    if not root.is_dir():
+        lines.append("  direktori tidak ditemukan")
+        return "\n".join(lines)
+
+    for cls in CLASSES:
+        cls_dir = root / cls
+
+        if not cls_dir.is_dir():
+            lines.append(f"  {cls}/: direktori tidak ditemukan")
+            continue
+
+        files = sorted(p for p in cls_dir.iterdir() if p.is_file())
+        jpg_count = sum(1 for p in files if p.suffix == ".jpg")
+        extensions = sorted({p.suffix.lower() or "<tanpa ekstensi>" for p in files})
+        sample = ", ".join(p.name for p in files[:3])
+
+        lines.append(
+            f"  {cls}/: {jpg_count} *.jpg, {len(files)} file total"
+            + (f", ekstensi: {', '.join(extensions)}" if extensions else "")
+            + (f", contoh: {sample}" if sample else "")
+        )
+
+    return "\n".join(lines)
+
+
 def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict:
     """Ambil sampel citra acak deterministik per kelas.
 
@@ -58,12 +96,21 @@ def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict
 
     Args:
         data_dir (str): Direktori dataset (berisi infected/noninfected).
-        samples_per_class (int): Jumlah sampel per kelas.
+        samples_per_class (int): Jumlah sampel per kelas (minimal 1).
         seed (int): Seed acak agar sampel reprodusibel.
 
     Returns:
         dict: Daftar path citra per kelas ("infected", "noninfected").
+
+    Raises:
+        ValueError: Jika samples_per_class < 1, atau tidak ada citra .jpg
+            pada salah satu kelas (path salah, ekstensi lain, atau folder kosong).
     """
+    if samples_per_class < 1:
+        raise ValueError(
+            f"samples_per_class harus >= 1, diterima {samples_per_class}"
+        )
+
     rng = np.random.RandomState(seed)
     picked = {}
 
@@ -85,6 +132,19 @@ def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict
         else:
             idx = rng.choice(len(unique), samples_per_class, replace=False)
             picked[cls] = [unique[i] for i in sorted(idx)]
+
+    empty_classes = [cls for cls in CLASSES if not picked[cls]]
+
+    if empty_classes:
+        raise ValueError(
+            "Tidak ada citra .jpg yang bisa disampling untuk kelas "
+            f"{', '.join(empty_classes)}.\n"
+            f"{describe_data_dir(data_dir)}\n"
+            "Periksa: (1) --data-dir mengarah ke folder yang berisi "
+            "infected/ dan noninfected/ (mis. datasets/PCOS, bukan datasets); "
+            "(2) nama kelas huruf kecil; (3) ekstensi .jpg huruf kecil "
+            "(glob *.jpg case-sensitive, .JPG/.png tidak terbaca)."
+        )
 
     return picked
 
@@ -175,10 +235,14 @@ def main() -> None:
     args = parser.parse_args()
 
     out_root = PROJECT_ROOT / args.out_dir
+    picked = sample_images(args.data_dir, args.samples_per_class, args.seed)
+    print("Sampel: " + ", ".join(f"{cls}={len(picked[cls])}" for cls in CLASSES))
+
+    # Dibuat setelah sampling valid agar run yang gagal karena data-dir salah
+    # tidak meninggalkan direktori keluaran kosong.
     fig_dir = out_root / "figures"
     fig_dir.mkdir(parents=True, exist_ok=True)
 
-    picked = sample_images(args.data_dir, args.samples_per_class, args.seed)
     rows = []
 
     for cls in CLASSES:
@@ -197,6 +261,12 @@ def main() -> None:
                 )
 
             print(f"{cls} {i + 1}/{len(picked[cls])}: {path.name}")
+
+    if not rows:
+        raise ValueError(
+            "Tidak ada baris kualitas yang dihasilkan; periksa data-dir "
+            "dan samples-per-class."
+        )
 
     # Per-image CSV
     csv_path = out_root / "quality.csv"

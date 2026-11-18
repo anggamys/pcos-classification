@@ -75,8 +75,12 @@ class DatasetFailurePaths(unittest.TestCase):
         Image.fromarray(arr).convert("RGB").save(self.root / "noninfected" / "a.png")
         make_image_dir(self.root / "infected", 2)
 
-        with self.assertRaises(FileNotFoundError):
+        with self.assertRaises(FileNotFoundError) as ctx:
             PCOSDataset(self.root)
+
+        # Pesan harus menyebut ekstensi yang benar-benar ada agar pengguna
+        # tahu masalahnya .png (atau .JPG), bukan sekadar "tidak ada .jpg".
+        self.assertIn(".png", str(ctx.exception))
 
     def test_corrupt_image_raises_loudly(self) -> None:
         # File korup tidak di-swallow: PIL melempar error saat dibaca.

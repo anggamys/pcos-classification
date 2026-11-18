@@ -79,6 +79,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+Untuk mesin tanpa GPU (torch versi CPU, unduhan lebih kecil):
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
+
 ## Penggunaan
 
 ### Basic Training

@@ -9,9 +9,30 @@ Operasionalisasi yang disepakati (prespecified, bukan post-hoc):
   dengan AUC sebagai metrik utama; E5 (masked) dilaporkan deskriptif
   agar tidak terjadi seleksi varian terbaik di atas test set.
 - H3: E6 vs E4 dengan toleransi 0.005 pada akurasi/AUC.
+
+Untuk beberapa seed, kriteria di atas tidak diubah. Metrik agregat adalah
+rata-rata aritmetika antar seed, verdict dihitung pada baris rata-rata, dan
+status akhir accepted menuntut dukungan mayoritas seed (lihat
+`evaluate_replicated_hypotheses`). Aturan ini ditetapkan sebelum run
+multi-seed, bukan setelah melihat hasilnya.
 """
 
+import statistics
+
 METRIC_TOLERANCE = 0.005
+
+# Metrik yang dirata-ratakan lintas seed. `total_params` sengaja tidak ikut
+# karena properti arsitektur, bukan hasil run; latency diukur sekali per
+# matriks dan dipakai bersama semua seed.
+AGGREGATE_METRICS = (
+    "accuracy",
+    "precision",
+    "recall",
+    "f1",
+    "specificity",
+    "auc",
+    "infer_ms_cpu",
+)
 
 
 def _take(by_id: dict, row_id: str, keys: tuple) -> dict | None:
@@ -158,3 +179,110 @@ def evaluate_hypotheses(rows: list) -> dict:
         }
 
     return verdicts
+
+
+def aggregate_seed_rows(per_seed_rows: dict) -> tuple[list, list]:
+    """Rata-ratakan metrik tiap eksperimen lintas seed.
+
+    Metrik non-numerik (id, desc, attention) disalin dari seed pertama.
+    Simpangan baku memakai rumus sampel (n-1); dengan satu seed nilainya 0.
+
+    Args:
+        per_seed_rows (dict): Pemetaan label seed (mis. "42") ke daftar baris
+            hasil berformat `results.csv`.
+
+    Returns:
+        tuple: (mean_rows, sd_rows). `mean_rows` dipakai untuk verdict,
+            `sd_rows` memuat simpangan baku per metrik.
+    """
+    labels = list(per_seed_rows)
+
+    if not labels:
+        return [], []
+
+    by_seed = {
+        label: {row["id"]: row for row in rows}
+        for label, rows in per_seed_rows.items()
+    }
+    mean_rows = []
+    sd_rows = []
+
+    for experiment_id in [row["id"] for row in per_seed_rows[labels[0]]]:
+        template = by_seed[labels[0]][experiment_id]
+        mean_row = dict(template)
+        sd_row = {"id": experiment_id, "desc": template.get("desc", "")}
+
+        for metric in AGGREGATE_METRICS:
+            values = [
+                float(by_seed[label][experiment_id][metric])
+                for label in labels
+                if metric in by_seed[label].get(experiment_id, {})
+                and by_seed[label][experiment_id][metric] is not None
+            ]
+
+            if not values:
+                continue
+
+            mean_row[metric] = sum(values) / len(values)
+            sd_row[metric] = statistics.stdev(values) if len(values) > 1 else 0.0
+
+        mean_rows.append(mean_row)
+        sd_rows.append(sd_row)
+
+    return mean_rows, sd_rows
+
+
+def evaluate_replicated_hypotheses(per_seed_rows: dict) -> dict:
+    """Verdict H1-H3 pada agregat seed dengan syarat dukungan mayoritas.
+
+    Aturan prespecified:
+    - Metrik agregat = rata-rata aritmetika antar seed.
+    - Verdict agregat memakai kriteria H1-H3 yang sama seperti
+      `evaluate_hypotheses`, tanpa mengubah toleransi atau varian utama.
+    - Status akhir accepted hanya bila verdict agregat accepted dan minimal
+      ``n // 2 + 1`` seed juga accepted. Aturan ini mencegah satu run yang
+      kebetulan lolos menyelamatkan klaim.
+    - E5 tetap hanya dilaporkan deskriptif.
+
+    Args:
+        per_seed_rows (dict): Pemetaan label seed ke daftar baris hasil.
+
+    Returns:
+        dict: Verdict akhir, verdict agregat, verdict per seed, serta baris
+            rata-rata dan simpangan baku.
+    """
+    labels = list(per_seed_rows)
+    mean_rows, sd_rows = aggregate_seed_rows(per_seed_rows)
+    aggregate = evaluate_hypotheses(mean_rows)
+    per_seed = {
+        label: evaluate_hypotheses(rows) for label, rows in per_seed_rows.items()
+    }
+    required = len(labels) // 2 + 1
+    hypotheses = {}
+
+    for name, verdict in aggregate.items():
+        support = sum(
+            1
+            for seed_verdicts in per_seed.values()
+            if seed_verdicts.get(name, {}).get("status") == "accepted"
+        )
+        accepted = verdict["status"] == "accepted" and support >= required
+        hypotheses[name] = {
+            "status": "accepted" if accepted else "not_accepted",
+            "detail": (
+                f"{verdict['detail']}; dukungan seed {support}/{len(labels)} "
+                f"(syarat {required}/{len(labels)})"
+            ),
+            "support": f"{support}/{len(labels)}",
+        }
+
+    return {
+        "n_seeds": len(labels),
+        "seeds": labels,
+        "required_support": required,
+        "hypotheses": hypotheses,
+        "aggregate_hypotheses": aggregate,
+        "per_seed_hypotheses": per_seed,
+        "mean_rows": mean_rows,
+        "sd_rows": sd_rows,
+    }

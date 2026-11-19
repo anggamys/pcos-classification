@@ -3,6 +3,7 @@
 # Dijalankan dengan:
 #   python experiments/run_matrix.py --config experiments/experiments.yml
 #   python experiments/run_matrix.py --config experiments/experiments.yml --only E1,E2
+#   python experiments/run_matrix.py --seeds 42,43,44   # agregasi mean +/- SD
 #
 # Nilai tiap eksperimen menimpa blok defaults di bawah. Field hypothesis dan
 # tests hanya dokumentasi ketertelusuran H1-H3 (diabaikan runner).

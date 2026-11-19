@@ -186,6 +186,23 @@ sekali per matriks (5 putaran x 20 forward, median, model dibandingkan
 bergantian) dan disimpan di `latency.json` supaya semua seed memakai angka yang
 sama. `--remeasure-latency` memaksa pengukuran ulang.
 
+Flag `run_matrix.py` yang sering dipakai:
+
+| Flag                | Default | Deskripsi                                                          |
+| ------------------- | ------- | ------------------------------------------------------------------ |
+| `--seeds`           | kosong  | Seed koma-pisah; mengaktifkan layout `seed-<n>/` dan agregasi      |
+| `--seed`            | YAML    | Seed tunggal untuk mode satu run (tidak untuk verdict)             |
+| `--only`            | semua   | Subset eksperimen, mis. `E1,E2`                                    |
+| `--aggregate-only`  | `false` | Agregasi `seed-*/results.csv` tanpa training                       |
+| `--latency-rounds`  | `5`     | Jumlah putaran benchmark latency                                   |
+| `--latency-repeats` | `20`    | Jumlah forward per putaran benchmark                               |
+| `--remeasure-latency` | `false` | Abaikan `latency.json` dan ukur ulang                            |
+| `--dry-run`         | `false` | Cetak perintah `main.py` per seed tanpa menjalankannya             |
+| `--out-dir`         | YAML    | Timpa direktori akar hasil                                         |
+
+`--seeds` dan `--seed` tidak boleh dipakai bersamaan. Seed duplikat, kosong,
+atau bukan bilangan bulat ditolak sebelum training dimulai.
+
 | ID  | Preprocessing       | Segmentasi/ROI | Attention      |
 | --- | ------------------- | -------------- | -------------- |
 | E1  | baseline            | none / full    | self_attention |
@@ -224,12 +241,18 @@ bila GPU belum aktif).
 # 0. Bukti sisi PCD untuk H1 (tanpa training, cepat, bisa jalan di CPU)
 python experiments/evaluate_quality.py --data-dir /content/drive/MyDrive/data-latih/PCOS --samples-per-class 100
 
-# Full matrix E1-E6 (data-dir Colab menimpa nilai YAML)
-python experiments/run_matrix.py --config experiments/experiments.yml --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30
+# 1. Tiga seed, keenam eksperimen (angka yang dipakai untuk verdict)
+python experiments/run_matrix.py --seeds 42,43,44 --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30
 
-# Sebagian dulu (disarankan untuk sesi Colab pendek)
-python experiments/run_matrix.py --config experiments/experiments.yml --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30 --only E1,E2
+# 2. Bila sesi terbatas: satu seed dulu, lalu lanjutkan dan gabungkan
+python experiments/run_matrix.py --seeds 42 --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30
+python experiments/run_matrix.py --seeds 43,44 --data-dir /content/drive/MyDrive/data-latih/PCOS --epochs 30
+python experiments/run_matrix.py --aggregate-only
 ```
+
+Estimasi sekitar 2 jam untuk tiga seed di T4. Agregasi memakai semua folder
+`results/seed-*/` yang ada, jadi `--aggregate-only` boleh dijalankan kapan pun
+tanpa training ulang. Jangan memilih atau membuang seed berdasarkan hasilnya.
 
 Ganti `device: auto` menjadi `device: cuda` di `experiments/experiments.yml`
 bila ingin matrix berhenti dengan pesan jelas saat runtime tidak punya GPU.

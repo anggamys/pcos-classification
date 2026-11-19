@@ -178,7 +178,7 @@ Dua sudut evaluasi dari run yang sama:
 
 ## 8. Artefak dan ketelusuran
 
-Tiap eksperimen menulis ke `experiments/results/<ID>/`:
+Tiap eksperimen menulis ke `experiments/results/[seed-<n>/]<ID>/`:
 
 | Berkas             | Isi                                                                                                 |
 | ------------------ | --------------------------------------------------------------------------------------------------- |
@@ -190,10 +190,16 @@ Tiap eksperimen menulis ke `experiments/results/<ID>/`:
 
 Level matriks di `experiments/results/`:
 
-- `results.csv`: satu baris per eksperimen (konfigurasi, metrik, parameter,
-  latency, pos_weight, returncode).
-- `matrix_summary.json`: seluruh baris, verdict H1-H3, dan salinan tiap
-  `run_summary.json`.
+- `seed-<n>/results.csv`: satu baris per eksperimen untuk seed itu
+  (konfigurasi, seed, metrik, parameter, latency, pos_weight, returncode).
+- `aggregate.csv`: rata-rata dan simpangan baku tiap metrik lintas seed.
+- `matrix_summary.json`: hasil agregat, verdict H1-H3 (agregat dan per seed),
+  baris tiap seed, salinan `run_summary.json`, dan payload `latency.json`.
+- `latency.json`: benchmark latency bersama (median, min, max, sampel per
+  putaran) untuk setiap jenis attention.
+
+Tanpa `--seeds`, layout lama tetap dipakai: `results/<ID>/` dan
+`results/results.csv`. Mode itu hanya untuk cek pipeline, bukan untuk verdict.
 
 Saat dijalankan lewat `run_matrix.py`, keluaran child process juga tampil
 live di terminal (child dijalankan dengan `-u`, stdout dan stderr digabung),
@@ -201,32 +207,69 @@ jadi training bisa dipantau tanpa menunggu run selesai.
 
 ## 9. Urutan eksekusi
 
-Lokal (CPU cukup untuk cek pipeline, bukan untuk hasil):
+### 9.1. Lokal (cek pipeline, bukan untuk hasil)
 
 ```bash
-python -m unittest tests.test_failure_paths tests.test_pos_weight tests.test_streaming
+# Seluruh suite, termasuk test agregasi dan benchmark latency
+python -m unittest discover -s tests -t .
+
+# Satu epoch untuk memastikan dataset, model, dan Grad-CAM berjalan
 python main.py --data-dir "$DATA_DIR" --epochs 1 --batch-size 4 --num-workers 0
+
+# Cetak perintah main.py yang akan dijalankan matriks, tanpa training
+python experiments/run_matrix.py --seeds 42,43,44 --only E1,E6 --dry-run
 ```
 
-Colab T4 (urutan yang dipakai untuk hasil):
+### 9.2. Colab T4 (urutan yang dipakai untuk hasil)
 
 ```bash
-# 1. Bukti kualitas praproses (cepat, tanpa training)
+# 1. Pastikan kode yang dipakai adalah commit yang sudah di-push
+git rev-parse --short HEAD && git status --short
+
+# 2. Bukti kualitas praproses (cepat, tanpa training)
 python experiments/evaluate_quality.py --data-dir "$DATA_DIR" \
   --samples-per-class 100
 
-# 2. Matriks penuh E1-E6
-python experiments/run_matrix.py --config experiments/experiments.yml \
+# 3. Matriks multi-seed, tiga seed, keenam eksperimen
+python experiments/run_matrix.py --seeds 42,43,44 \
   --data-dir "$DATA_DIR" --epochs 30
 
-# 3. Bila sesi terbatas, kerjakan bertahap lalu gabungkan hasilnya
-python experiments/run_matrix.py --config experiments/experiments.yml \
-  --data-dir "$DATA_DIR" --epochs 30 --only E1,E2
+# 4. Bila sesi terputus, lanjutkan seed yang belum jalan lalu agregasi
+python experiments/run_matrix.py --seeds 44 \
+  --data-dir "$DATA_DIR" --epochs 30
+python experiments/run_matrix.py --aggregate-only
 ```
 
-Bila hanya sebagian eksperimen yang dijalankan ulang, `results.csv` dan
-`matrix_summary.json` akan ditimpa dengan subset tersebut. Simpan atau
-gabungkan berkas dari sesi sebelumnya bila ingin riwayat lengkap.
+`--aggregate-only` membaca semua `results/seed-*/results.csv` yang ada tanpa
+training, sehingga seed dapat dijalankan bertahap atau diunduh dari sesi lain
+lalu digabung. Agregasi selalu memakai seluruh seed yang tersedia, bukan hanya
+seed dari perintah terakhir. Seed tidak boleh dipilih atau dibuang berdasarkan
+hasilnya.
+
+Latency diukur sekali per matriks setelah training selesai. Pada run pertama
+perlu waktu tambahan di bawah satu menit; seed berikutnya memakai `latency.json`
+yang sama. Pakai `--remeasure-latency` hanya bila `latency.json` hilang atau
+mesin pengukuran berubah, karena angka baru membuat H3 tidak sebanding dengan
+seed lain.
+
+Bila hanya sebagian eksperimen yang dijalankan, isi `seed-<n>/results.csv`
+untuk seed itu akan ditimpa dengan subset tersebut. Folder per eksperimen tidak
+hilang, dan agregasi tetap dihitung dari CSV yang ada.
+
+### 9.3. Artefak yang diunduh dari Colab
+
+```text
+experiments/results/aggregate.csv
+experiments/results/matrix_summary.json
+experiments/results/latency.json
+experiments/results/seed-42/results.csv
+experiments/results/seed-43/results.csv
+experiments/results/seed-44/results.csv
+```
+
+Folder `seed-*/E*/` (checkpoint dan figure) hanya perlu diunduh bila akan
+dilampirkan sebagai bukti. Angka yang dipakai di bab hasil wajib berasal dari
+`aggregate.csv` dan `matrix_summary.json`, bukan dari satu `results.csv`.
 
 ## 10. Checklist sebelum run
 
@@ -236,10 +279,16 @@ gabungkan berkas dari sesi sebelumnya bila ingin riwayat lengkap.
 - [ ] Tiga perintah verifikasi di bagian 2 menghasilkan 6.784, 5.000, 11.784.
 - [ ] Working tree bersih dan commit sudah di-push, agar hash commit di
       `run_summary.json` menunjuk kode yang benar-benar dipakai.
-- [ ] Kuota Colab cukup untuk seluruh eksperimen (sekitar 50-60 menit per run
-      30 epoch di T4).
-- [ ] Folder `experiments/results` dari run lama dipindahkan bila ingin
-      membandingkan, karena nama folder per eksperimen akan dipakai ulang.
+- [ ] `--dry-run` mencetak perintah dengan `--seed` yang benar untuk tiap seed
+      dan `--save-dir` menunjuk `results/seed-<n>/E*`.
+- [ ] Kuota Colab cukup untuk tiga seed (sekitar 2 jam di T4, 40-45 menit per
+      seed). Bila tidak, jalankan seed lebih sedikit tetapi jangan memilih seed
+      berdasarkan hasil.
+- [ ] `experiments/results/` dari run lama dipindahkan atau diganti nama, karena
+      folder `seed-<n>/` akan dipakai ulang.
+- [ ] Setelah selesai, `aggregate.csv` dan `matrix_summary.json` diunduh dan
+      dicek: `n_seeds` sesuai, `support` tiap hipotesis masuk akal, dan
+      `latency_benchmark` ada.
 
 ## 11. Catatan replikasi
 

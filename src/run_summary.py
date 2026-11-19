@@ -94,6 +94,7 @@ def save_run_summary(
             "cuda_available": torch.cuda.is_available(),
             "cuda_version": torch.version.cuda,
             "amp": device.type == "cuda",
+            "cudnn_benchmark": torch.backends.cudnn.benchmark,
             "gpu_name": torch.cuda.get_device_name(0)
             if device.type == "cuda"
             else None,

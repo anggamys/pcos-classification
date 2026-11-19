@@ -204,7 +204,10 @@ def train(
         device = resolve_device(config.get("device", "auto"))
 
     if device.type == "cuda":
-        torch.backends.cudnn.benchmark = True
+        # benchmark=True memilih algoritma cuDNN berbeda antar run sehingga
+        # seed yang sama tidak reprodusibel. Ukuran input tetap 224 px, jadi
+        # autotuning tidak memberi keuntungan yang berarti.
+        torch.backends.cudnn.benchmark = False
         torch.set_float32_matmul_precision("high")
 
     model = model.to(device)

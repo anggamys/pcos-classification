@@ -251,8 +251,10 @@ ancaman validitas karena dapat menjadi isyarat palsu bagi model.
 
 Hasil lama (accuracy 99,72%) tidak sah dan tidak boleh dikutip: dibuat sebelum
 deduplikasi dan sebelum perbaikan penempatan attention. Checkpoint lama juga
-tidak kompatibel dengan arsitektur sekarang. Semua angka E1-E6 berasal dari run
-baru pada commit `70e0de3` (Colab T4) dan tersimpan di `experiments/results/`.
+tidak kompatibel dengan arsitektur sekarang. Semua angka E1-E6 pada bab hasil
+berasal dari run baru pada commit `70e0de3` (Colab T4) dan tersimpan di
+`experiments/results/`. Run ulang pada konfigurasi yang sama menghasilkan angka
+berbeda; protokol agregasi multi-seed ada di bagian 11.3.
 
 Setelah run tersebut, ditemukan peringatan `pywt` pada 4 citra noninfected yang
 subband HH1-nya tidak memiliki variasi (sigma noise = 0). Soft threshold
@@ -308,3 +310,46 @@ urutan keep-first.
 - `results.csv` membulatkan metrik ke 4 desimal; nilainya konsisten dengan
   `run_summary.json` setelah pembulatan. Verdict H2 dihitung dari nilai bulat
   itu, tetapi margin 0,0017 masih jauh di atas galat pembulatan.
+
+### 11.3. Protokol multi-seed dan agregasi
+
+Tiga run matriks pada konfigurasi, data, dan seed yang sama (16, 18, dan
+19 November 2026) menghasilkan angka yang berbeda: accuracy E2 bergerak
+94,67 sampai 98,17 dan E3 bergerak 92,33 sampai 96,00, sementara toleransi
+verdict 0,5 poin. Perbedaan itu membalik verdict H1 dan H2 antar run. Karena
+itu hasil satu run tidak dipakai untuk verdict.
+
+Aturan agregasi berikut ditetapkan sebelum run seed 43 dan 44, tanpa mengubah
+kriteria H1-H3:
+
+1. Setiap seed menjalankan keenam eksperimen dengan split, epoch, dan early
+   stopping yang sama; hanya seed RNG yang berbeda.
+2. Metrik agregat adalah rata-rata aritmetika antar seed. Simpangan baku
+   sampel (n-1) dilaporkan sebagai dispersi, bukan interval kepercayaan.
+3. Verdict dihitung dengan kriteria H1-H3 yang sama pada baris rata-rata.
+4. Status akhir accepted hanya bila verdict agregat accepted dan minimal
+   mayoritas seed (`n // 2 + 1`) juga accepted. Aturan ini mencegah satu run
+   yang kebetulan lolos menyelamatkan klaim. E5 tetap deskriptif dan varian
+   utama H2 tetap E4.
+5. Semua seed yang dipakai harus dilaporkan. Seed tidak boleh dipilih
+   berdasarkan hasilnya.
+
+Perintah dan layout keluaran:
+
+    python experiments/run_matrix.py --seeds 42,43,44 --only E1,E2
+    python experiments/run_matrix.py --aggregate-only
+
+Hasil per seed ada di `experiments/results/seed-<n>/E*/`, ringkasan per seed
+di `seed-<n>/results.csv`, dan agregat di `aggregate.csv` serta
+`matrix_summary.json`. Agregasi memakai semua folder `seed-*` yang ada,
+sehingga seed dapat dijalankan bertahap lalu digabung tanpa training ulang.
+
+Latency diukur sekali per matriks. Model self-attention dan CBAM dibangun
+dalam satu proses, lalu diukur bergantian 5 putaran x 20 forward; angka yang
+dipakai adalah median, bukan satu pengukuran. Hasilnya disimpan di
+`latency.json` dan dipakai bersama semua seed agar H3 tidak membandingkan
+sesi pengukuran yang berbeda.
+
+`cudnn.benchmark` dimatikan sejak protokol ini karena autotuning memilih
+algoritma berbeda antar run pada seed yang sama. Determinisme penuh tidak
+dijamin oleh flag itu; variasi antar seed tetap diukur, bukan diasumsikan nol.

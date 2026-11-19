@@ -168,6 +168,24 @@ python experiments/run_matrix.py --config experiments/experiments.yml
 python experiments/run_matrix.py --config experiments/experiments.yml --only E1,E2
 ```
 
+Multi-seed dengan agregasi mean +/- SD:
+
+```bash
+# Layout menjadi experiments/results/seed-<n>/E*, agregat ke aggregate.csv.
+# Boleh bertahap: seed yang sudah ada ikut diagregasi.
+python experiments/run_matrix.py --seeds 42,43,44 --only E1,E2
+
+# Gabung ulang tanpa training (mis. setelah mengunduh hasil seed lain)
+python experiments/run_matrix.py --aggregate-only
+```
+
+Aturan agregasi: metrik dirata-ratakan antar seed, verdict H1-H3 dihitung pada
+baris rata-rata, dan status accepted menuntut dukungan mayoritas seed. Detail
+protokol ada di `references/tahapan-penelitian.md` bagian 11.3. Latency diukur
+sekali per matriks (5 putaran x 20 forward, median, model dibandingkan
+bergantian) dan disimpan di `latency.json` supaya semua seed memakai angka yang
+sama. `--remeasure-latency` memaksa pengukuran ulang.
+
 | ID  | Preprocessing       | Segmentasi/ROI | Attention      |
 | --- | ------------------- | -------------- | -------------- |
 | E1  | baseline            | none / full    | self_attention |
@@ -216,12 +234,13 @@ python experiments/run_matrix.py --config experiments/experiments.yml --data-dir
 Ganti `device: auto` menjadi `device: cuda` di `experiments/experiments.yml`
 bila ingin matrix berhenti dengan pesan jelas saat runtime tidak punya GPU.
 
-Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, `training.log`, dan ringkasan metrik ke `experiments/results/results.csv`. Saat dijalankan lewat `run_matrix.py`, log training juga tampil live di terminal (stdout dan stderr digabung). Estimasi ±50-60 menit per run 30 epoch di T4.
+Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, `training.log`, dan ringkasan metrik ke `experiments/results/results.csv` (pada mode multi-seed: `experiments/results/seed-<n>/results.csv`, lalu agregat ke `aggregate.csv`). Saat dijalankan lewat `run_matrix.py`, log training juga tampil live di terminal (stdout dan stderr digabung). Estimasi ±50-60 menit per run 30 epoch di T4.
 
 ### Dokumentasi JSON (proses & hasil machine-readable)
 
-- Tiap run menulis `run_summary.json` di folder `--save-dir`-nya: timestamp, git commit, environment (device/GPU/versi torch), config lengkap, ukuran dataset, parameter model, history per-epoch, epoch terbaik, flag early stopping, metrik test, dan daftar artefak.
-- `run_matrix.py` menulis `matrix_summary.json` di `out_dir`: seluruh baris eksperimen + verdict deskriptif H1-H3 (`accepted`/`not_accepted`, hanya untuk eksperimen yang datanya tersedia) + salinan tiap `run_summary.json`.
+- Tiap run menulis `run_summary.json` di folder `--save-dir`-nya: timestamp, git commit, environment (device/GPU/versi torch, `cudnn_benchmark`), config lengkap, ukuran dataset, parameter model, history per-epoch, epoch terbaik, flag early stopping, metrik test, dan daftar artefak.
+- `run_matrix.py` menulis `matrix_summary.json` di `out_dir`: seluruh baris eksperimen + verdict deskriptif H1-H3 (`accepted`/`not_accepted`, hanya untuk eksperimen yang datanya tersedia) + salinan tiap `run_summary.json`. Pada mode multi-seed, file ini memuat rata-rata, simpangan baku, verdict agregat, dan verdict per seed.
+- `latency.json` di `out_dir` menyimpan benchmark latency bersama: median, min, max, dan sampel per putaran untuk tiap jenis attention.
 - `evaluate_quality.py` menulis `summary.json` di samping `summary.txt` (mean/std/min/max per metrik, per kelas).
 
 ## Hasil
@@ -248,6 +267,13 @@ Tiap eksperimen menyimpan checkpoint, plot, `stdout.log`, `training.log`, dan ri
 Hasil valid dari run Colab T4 pada commit `70e0de3`, 30 epoch maksimum dengan
 early stopping patience 10, split test 600 citra. Sumber angka:
 `experiments/results/results.csv` dan `experiments/results/matrix_summary.json`.
+
+Tabel ini berasal dari satu run (seed 42). Run ulang pada konfigurasi, data,
+dan seed yang sama menghasilkan accuracy yang bergerak sampai 3,7 poin dan
+membalik verdict H1 serta H2, sehingga label H1-H3 di bawah berlaku untuk run
+ini saja. Verdict final memakai agregat multi-seed sesuai protokol di
+`references/tahapan-penelitian.md` bagian 11.3; tabel agregat akan menggantikan
+tabel ini setelah seed 43 dan 44 selesai.
 
 | ID  | Accuracy | Precision | Recall | F1     | Specificity | AUC    |
 | --- | -------- | --------- | ------ | ------ | ----------- | ------ |

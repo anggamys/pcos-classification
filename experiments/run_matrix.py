@@ -18,6 +18,7 @@ import codecs
 import csv
 import json
 import re
+import shlex
 import statistics
 import subprocess
 import sys
@@ -467,6 +468,10 @@ def save_aggregate(out_root: Path) -> None:
     output_path.write_text(json.dumps(matrix, indent=2))
 
     print(f"Saved {output_path}")
+    print(f"Agregat {len(labels)} seed: {', '.join(labels)}")
+
+    for name, verdict in report["hypotheses"].items():
+        print(f"{name}: {verdict['status']} ({verdict['support']})")
 
 
 def build_command(experiment: dict, save_dir: Path) -> list:
@@ -739,19 +744,27 @@ def main() -> None:
 
         return
 
-    if args.dry_run:
-        for experiment in selected:
-            print(f"{experiment['id']}: {experiment['desc']}")
-
-        return
-
-    attention_types = sorted({experiment["attention"] for experiment in selected})
-
     if seeds is None:
         runs = [(None, out_root)]
     else:
         runs = [(seed, out_root / f"{SEED_DIR_PREFIX}{seed}") for seed in seeds]
 
+    if args.dry_run:
+        for seed, run_root in runs:
+            prefix = f"[seed {seed}] " if seed is not None else ""
+
+            for experiment in selected:
+                item = dict(experiment)
+
+                if seed is not None:
+                    item["seed"] = seed
+
+                command = build_command(item, run_root / experiment["id"])
+                print(f"{prefix}{shlex.join(command)}")
+
+        return
+
+    attention_types = sorted({experiment["attention"] for experiment in selected})
     written = []
 
     for seed, run_root in runs:

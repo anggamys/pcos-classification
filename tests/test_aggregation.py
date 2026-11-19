@@ -293,10 +293,14 @@ class AggregateFileTests(unittest.TestCase):
             {**base, "id": "E4", "desc": "roi otsu", "auc": 0.992, "f1": 0.975},
         ]
 
-        with contextlib.redirect_stdout(io.StringIO()):
+        with contextlib.redirect_stdout(io.StringIO()) as buffer:
             self._write_seed("42", seed42)
             self._write_seed("43", seed43)
             run_matrix.save_aggregate(self.out_root)
+
+        output = buffer.getvalue()
+        self.assertIn("Agregat 2 seed: 42, 43", output)
+        self.assertIn("H2: accepted (2/2)", output)
 
         matrix = json.loads((self.out_root / "matrix_summary.json").read_text())
         self.assertEqual(matrix["n_seeds"], 2)
@@ -338,6 +342,18 @@ class AggregateFileTests(unittest.TestCase):
         imported = matrix["per_seed_experiments"]["42"][0]
         self.assertEqual(imported["infer_ms_cpu"], 12.5)
         self.assertEqual(imported["total_params"], 42)
+
+    def test_save_matrix_summary_single_run_prints_verdicts(self) -> None:
+        rows = [_row("E3"), _row("E4", f1=0.98, auc=0.995)]
+
+        with contextlib.redirect_stdout(io.StringIO()) as buffer:
+            run_matrix.save_matrix_summary(self.out_root, rows)
+
+        matrix = json.loads((self.out_root / "matrix_summary.json").read_text())
+        self.assertEqual(matrix["hypotheses"]["H2"]["status"], "accepted")
+
+        output = buffer.getvalue()
+        self.assertIn("Saved", output)
 
     def test_save_aggregate_without_seed_dirs_does_not_write(self) -> None:
         with contextlib.redirect_stdout(io.StringIO()):

@@ -156,12 +156,12 @@ pemrosesan awal dipilih karena variasi kontras dan kualitas akuisisi dapat
 menggeser performa pengklasifikasi citra medis [10]. Sesuai konfigurasi
 eksperimen, tahap berikut bisa menambahkan CLAHE (_contrast limited adaptive
 histogram equalization_) [11] dan/atau wavelet denoising
-BayesShrink [12], [13]. Fig. 1 mengilustrasikan alur end-to-end sampai evaluasi.
+BayesShrink [12], [13]. Gambar 1 mengilustrasikan alur end-to-end dari tahap
+pemrosesan awal hingga evaluasi model.
 
-_(FIGUR 1: diagram pipeline end-to-end. Harus dibuat sebagai gambar berbahasa
-Inggris, min. 300 dpi: resize/normalize → CLAHE (optional) → BayesShrink
-wavelet denoising (optional) → follicle segmentation (Otsu/adaptive) → input
-mode (full/ROI/masked) → DenseNet-121 + attention → Grad-CAM.)_
+![Gambar 1. Diagram alur sistem klasifikasi PCOS berbasis DenseNet-121 dengan prapemrosesan wavelet, segmentasi folikel, dan mekanisme attention.](figures/fig1_pipeline.png)
+
+**Gambar 1. Diagram alur sistem klasifikasi PCOS berbasis DenseNet-121 dengan prapemrosesan wavelet, segmentasi folikel, dan mekanisme attention.**
 
 Denoising wavelet menerapkan soft thresholding pada koefisien detail setiap
 subband. Varian noise diestimasi dari subband HH melalui _median absolute
@@ -175,10 +175,7 @@ sebaran koefisien subband tersebut:
 T*j = σ̂² / σ*{w,j} (2)
 
 dengan w adalah koefisien detail subband HH, σ̂ estimasi standar deviasi
-noise, dan σ\_{w,j} standar deviasi koefisien subband j. Pada finalisasi,
-kedua persamaan ditulis ulang lewat equation editor di DOCX (bukan gambar)
-dengan nomor rata kanan dan dirujuk di teks menurut nomornya; bentuk
-persamaan juga disamakan dengan implementasi di `src/preprocessing/wavelet.py`.
+noise, dan σ\_{w,j} standar deviasi koefisien subband j.
 
 Dua metrik deskriptif sisi pengolahan citra menyertai tahap ini:
 _peak signal-to-noise ratio_ (PSNR) dan _structural similarity_
@@ -213,9 +210,9 @@ agar perbandingan setara.
 | roi    | Bounding box mask + padding 8 px, di-resize ke 224 | Zoom ke area ovarium/folikel                        |
 | masked | Citra penuh dengan area di luar mask digelapkan    | Proporsi asli dipertahankan, background dieliminasi |
 
-Mode masked diimplementasikan oleh `apply_masked` pada
-`src/preprocessing/segmentation.py`: piksel di luar mask dinolkan tanpa
-mengubah ukuran atau proporsi citra asli.
+Pada mode masked, intensitas piksel di luar area mask segmentasi dinolkan
+(diberikan nilai nol atau latar belakang hitam) tanpa mengubah ukuran spasial
+maupun proporsi anatomi citra asli.
 
 ### 3.4. Arsitektur Attention dan Backbone
 
@@ -230,7 +227,7 @@ semuanya ditempatkan pada peta fitur sebelum pooling global:
   pada token spasial. Token fitur spasial berdimensi (B, H·W, C): untuk
   input 224 piksel, H = W = 7 sehingga N = 49 token.
 
-  Attention(Q, K, V) = softmax(QKᵀ / √d_k) · V (3) -- equation editor
+  Attention(Q, K, V) = softmax(QKᵀ / √d_k) · V (3)
 
   Catatan implementasi penting: pada versi awal, self-attention sempat
   ditempatkan setelah pooling (hanya satu token per citra) dan attention-nya
@@ -248,12 +245,12 @@ semuanya ditempatkan pada peta fitur sebelum pooling global:
 
 Untuk perbandingan antar mekanisme attention hanya dua kandidat yang
 diangkat: self-attention (replikasi Artikel 1) dan CBAM (kandidat ringan yang
-memberi spatial attention relevan dengan folikel). Pilihan ini
-diaktifkan lewat argumen `--attention`; jumlah parameter dan latensi
-dicatat ke `experiments/results/results.csv`. Sebagai pembanding efisiensi di
-tingkat backbone, MobileNetV2 menunjukkan bahwa inverted residual dan linear
-bottleneck dapat menekan biaya komputasi tanpa mengorbankan akurasi secara
-berarti [22].
+memberi spatial attention relevan dengan folikel). Kedua mekanisme attention
+ini diintegrasikan ke dalam arsitektur DenseNet-121 untuk mengevaluasi
+trade-off antara akurasi diagnostik, jumlah parameter, dan latensi inferensi.
+Sebagai pembanding efisiensi di tingkat backbone, MobileNetV2 menunjukkan
+bahwa inverted residual dan linear bottleneck dapat menekan biaya komputasi
+tanpa mengorbankan akurasi secara berarti [22].
 
 ### 3.5. Protokol Pelatihan dan Penanganan Ketimpangan Kelas
 
@@ -270,14 +267,14 @@ Ketimpangan kelas 4:1 ditangani dengan pos_weight pada
 BCEWithLogitsLoss — variabel w di Persamaan (4) di-set rasio
 n_negatif/n_positif yang dihitung hanya dari split train:
 
-ℓ = (1/N) Σ [ −w · yᵢ · log pᵢ − (1−yᵢ) · log(1−pᵢ) ] (4) -- equation editor
+ℓ = (1/N) Σ [ −w · yᵢ · log pᵢ − (1−yᵢ) · log(1−pᵢ) ] (4)
 
 dengan yᵢ biner label kelas positif (PCOS) dan pᵢ peluang prediksi. Pendekatan
 ini menyeimbangkan gradien kedua kelas tanpa mengubah distribusi data,
 berbeda dari resampling, SMOTE, atau augmentasi berlebih yang dapat
-memperbesar risiko overfitting pada kelas minoritas [25]; nilai w yang dipakai (0.2509 pada seluruh run) terekam pada
-`run_summary.json` tiap run dan dapat dinonaktifkan dengan
-`--no-pos-weight` untuk kebutuhan kontrol.
+memperbesar risiko overfitting pada kelas minoritas [25]. Nilai pembobot w
+yang diperoleh dari rasio data latih adalah 0.2509 dan diterapkan secara
+seragam pada seluruh eksperimen.
 
 ### 3.6. Hipotesis, Matriks Eksperimen, dan Metrik Evaluasi
 
@@ -298,9 +295,8 @@ Table 4 memetakan enam konfigurasi eksperimen ke hipotesis.
 | E5  | BayesShrink + CLAHE | otsu / masked  | self-attention | H2 (deskriptif) |
 | E6  | BayesShrink + CLAHE | otsu / roi     | cbam           | H3              |
 
-Kriteria keberhasilan masing-masing hipotesis, diprespecified di
-`experiments/hypotheses.py` sehingga verdict dievaluasi otomatis dengan kode
-yang sama (bukan penilaian manual penulis):
+Kriteria keberhasilan masing-masing hipotesis dirumuskan dan ditetapkan secara
+prespecified sebelum eksperimen dievaluasi guna mencegah bias penilaian subjektif:
 
 - **H1 (denoising):** diterima bila akurasi atau AUC E2 lebih tinggi secara
   ketat dari E1 pada minimal satu metrik tanpa regresi lebih dari 0.005 pada
@@ -318,13 +314,14 @@ yang sama (bukan penilaian manual penulis):
 
 Metrik evaluasi sisi diagnostik: accuracy, precision, recall, F1-score,
 specificity, dan AUC, dilengkapi confusion matrix dan kurva ROC. Karena H3
-mencakup sisi efisiensi, jumlah parameter dan latensi inferensi CPU
-(`infer_ms_cpu`) juga direkam. Bukti sisi pengolahan citra (PSNR/SSIM,
-statistik ROI: jumlah region, coverage, luas rata-rata dan maksimum) dan
-overlay mask dihasilkan tanpa pelatihan oleh `evaluate_quality.py`, jadi bebas
-dari variabilitas pelatihan. Verdict H1–H3 direkam pada
-`matrix_summary.json`, sehingga setiap klaim pada Bab 4 dapat dilacak ke
-file yang dihasilkan pipeline, bukan dihitung manual.
+mencakup dimensi efisiensi komputasi, jumlah parameter model dan latensi
+inferensi pada prosesor CPU (dalam milidetik per sampel) turut diukur.
+Evaluasi sisi pengolahan citra (PSNR, SSIM, serta statistik ROI yang mencakup
+jumlah region, cakupan area, luas rata-rata, dan luas maksimum) beserta
+visualisasi overlay mask dievaluasi secara deterministik pada tahap
+prapemrosesan sehingga bebas dari variabilitas pelatihan model. Penentuan
+keputusan akhir hipotesis H1–H3 ditarik secara objektif berbasis aturan
+kuantitatif yang telah ditentukan.
 
 Empat batasan desain yang disebut sejak awal: (a) tidak ada mask
 ground-truth — segmentasi berperan sebagai penyedia ROI, bukan pengukuran
@@ -335,13 +332,12 @@ lolos md5; (d) kuota komputasi Colab membatasi replikasi multi-seed.
 
 ## 4. Hasil dan Pembahasan
 
-Seluruh angka pada bab ini dihasilkan pipeline pada commit `1437398` dan
-tersimpan pada `experiments/results/results.csv`,
-`experiments/results/matrix_summary.json`, serta
-`experiments/quality/summary.json`. Setiap eksperimen dijalankan sekali
-dengan seed 42 pada GPU Tesla T4. Test set berisi 600 citra (478 PCOS,
-122 sehat), sehingga satu kesalahan klasifikasi setara dengan 0.17 poin
-persentase akurasi.
+Seluruh metrik performa yang dilaporkan pada bab ini diperoleh dari pengujian
+pada subset uji independen (test set) yang tidak pernah dilihat model selama
+pelatihan. Setiap konfigurasi eksperimen dilatih menggunakan seed pengacakan
+tetap (seed 42) pada akselerator GPU Tesla T4. Test set berisi 600 citra
+(478 PCOS, 122 sehat), sehingga satu kesalahan klasifikasi setara dengan 0.17
+poin persentase akurasi.
 
 ### 4.1. Denoising terhadap Kualitas Citra dan Klasifikasi (E1 vs E2)
 
@@ -389,9 +385,9 @@ manfaat diskriminatif.
 | Luas region rata-rata (px) | 1624.07 ± 1609.38 | 2114.35 ± 1234.11  |
 | Luas region maksimum (px)  | 7613.99 ± 6068.78 | 14425.13 ± 5342.91 |
 
-**Gambar 2. Contoh keluaran preprocessing pada satu citra per kelas (kiri ke
-kanan): raw, denoised BayesShrink, CLAHE, dan overlay mask Otsu. Berkas:
-`experiments/quality/figures/`.**
+![Gambar 2. Contoh keluaran prapemrosesan pada satu citra per kelas (kiri ke kanan: citra asli, denoised BayesShrink, CLAHE, dan overlay mask Otsu): (a) kelas PCOS dan (b) kelas kontrol sehat.](figures/fig2_preprocessing.png)
+
+**Gambar 2. Contoh keluaran prapemrosesan pada satu citra per kelas (kiri ke kanan: citra asli, denoised BayesShrink, CLAHE, dan overlay mask Otsu): (a) kelas PCOS dan (b) kelas kontrol sehat.**
 
 ### 4.2. Segmentasi Folikel terhadap Klasifikasi (E3 vs E4 vs E5)
 
@@ -431,8 +427,9 @@ pemeriksaan kualitatif.
 | E5  | BayesShrink + CLAHE | masked         | self-attention | 98.67   | 99.37    | 98.96      | 99.16  | 97.52    | 0.9980 | 11.42     | 119.95        |
 | E6  | BayesShrink + CLAHE | roi            | cbam           | 96.33   | 100.00   | 95.41      | 97.65  | 100.00   | 0.9965 | 7.35      | 150.87        |
 
-**Gambar 3. Kurva ROC dan confusion matrix konfigurasi utama (E4 dan E5);
-berkas asal pada `experiments/results/E4/` dan `experiments/results/E5/`.**
+![Gambar 3. Kurva ROC dan matriks konfusi konfigurasi utama: (a) kurva ROC E4 (ROI crop), (b) matriks konfusi E4, (c) kurva ROC E5 (masked input), dan (d) matriks konfusi E5.](figures/fig3_evaluation.png)
+
+**Gambar 3. Kurva ROC dan matriks konfusi konfigurasi utama: (a) kurva ROC E4 (ROI crop), (b) matriks konfusi E4, (c) kurva ROC E5 (masked input), dan (d) matriks konfusi E5.**
 
 ### 4.3. Perbandingan Mekanisme Attention (E4 vs E6)
 
@@ -457,7 +454,7 @@ sumbu efisiensi yang berbeda; klaim arsitektur ringan pada Artikel 1 [4]
 tanpa pengukuran latensi tidak cukup untuk menyimpulkan kesiapan
 low-resource. Table 7 merangkum verdict ketiga hipotesis beserta kriterianya.
 
-**Table 7. Ringkasan verdict hipotesis dari `matrix_summary.json`.**
+**Table 7. Ringkasan keputusan evaluasi hipotesis penelitian.**
 
 | Hipotesis | Perbandingan | Kriteria                                                                         | Verdict        |
 | --------- | ------------ | -------------------------------------------------------------------------------- | -------------- |
@@ -490,8 +487,9 @@ secara visual dan tidak ada kuantifikasi korelasi heatmap terhadap mask,
 klaim pada subbab ini bersifat ilustratif; arahnya konsisten dengan hasil
 kuantitatif H2, tetapi belum menjadi bukti statistik tersendiri.
 
-**Gambar 4. Heatmap Grad-CAM E4 pada lima sampel (asli, heatmap, overlay).
-Berkas: `experiments/results/E4/gradcam_visualization.png`.**
+![Gambar 4. Visualisasi heatmap Grad-CAM konfigurasi E4 pada lima sampel representatif (citra asli, heatmap aktivasi, dan overlay aktivasi).](figures/fig4_gradcam.png)
+
+**Gambar 4. Visualisasi heatmap Grad-CAM konfigurasi E4 pada lima sampel representatif (citra asli, heatmap aktivasi, dan overlay aktivasi).**
 
 ### 4.5. Perbandingan dengan Studi Terdahulu
 

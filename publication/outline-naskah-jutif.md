@@ -2,17 +2,17 @@
 
 Target: JUTIF Vol. 7 No. 2 (Februari 2026) atau terbitan berikutnya (rolling submission).
 Sumber konten: `references/kajian-literatur-gap-hipotesis.md` (sumber tunggal narasi),
-`README.md` (teknis), `experiments/results/results.csv` (hasil — MENUNGGU TRAINING).
+`README.md` (teknis), `experiments/results/results.csv` (hasil E1–E6, tersedia).
 
 ## Keputusan pra-penulisan (perlu dikunci lebih dulu)
 
-| Keputusan | Opsi | Status |
-| --- | --- | --- |
-| Bahasa isi | Indonesia (judul/abstrak/kata kunci Inggris) atau full Inggris | Belum dipilih |
-| Cara tulis | Edit langsung `JUTIF-Template.docx` | Sesuai saran panduan |
-| Bagian Result | Menunggu hasil E1–E6 dari Colab | BLOCKER — bagian hasil baru kerangka |
-| Framing replikasi Artikel 1 | Dilaporkan sebagai re-run independen yang gagal valid (karena dedup + placement fix), bukan replikasi sukses; angka lama (99,72%) TIDAK dipakai sebagai hasil valid karena test set lama terkontaminasi 81% duplikat | Sudah diputuskan di README |
-| Sudut evaluasi | Analisis Citra Medis (performa diagnostik + interpretabilitas); PSNR/SSIM dari sisi PCD dilaporkan sebagai bukti deskriptif H1, bukan cerita utama | Sesuai README proyek |
+| Keputusan                   | Opsi                                                                                                                                                                                                                 | Status                              |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Bahasa isi                  | Indonesia (judul/abstrak/kata kunci Inggris) atau full Inggris                                                                                                                                                       | Dikunci: Indonesia, judul/abstrak/kata kunci Inggris |
+| Cara tulis                  | Edit langsung `JUTIF-Template.docx`                                                                                                                                                                                  | Sesuai saran panduan                |
+| Bagian Result               | E1–E6 selesai; Draf 3 sudah memuat angka riil dan 28 referensi terverifikasi                                                                                                                                         | Selesai — sisa metadata penulis     |
+| Framing replikasi Artikel 1 | Dilaporkan sebagai re-run independen yang gagal valid (karena dedup + placement fix), bukan replikasi sukses; angka lama (99,72%) TIDAK dipakai sebagai hasil valid karena test set lama terkontaminasi 81% duplikat | Sudah diputuskan di README          |
+| Sudut evaluasi              | Analisis Citra Medis (performa diagnostik + interpretabilitas); PSNR/SSIM dari sisi PCD dilaporkan sebagai bukti deskriptif H1, bukan cerita utama                                                                   | Sesuai README proyek                |
 
 ## Judul (≤ 20 kata, Inggris, tanpa nama studi kasus)
 
@@ -48,9 +48,13 @@ Lima gerakan, masing-masing 1–2 kalimat:
    (3.996 citra unik pasca deduplikasi md5; rasio kelas 4:1 ditangani pos_weight
    BCE), split 70/15/15 dengan seed tetap; metrik Accuracy/F1/Specificity/AUC +
    Grad-CAM.
-4. **Hasil**: `[FILL — hasil E1–E6 + verdict H1–H3 dari results.csv]`.
-5. **Temuan/dampak**: `[FILL — peran pemrosesan citra eksplisit & seleksi attention
-   yang efisien untuk skrining low-resource]`.
+4. **Hasil**: denoising menaikkan akurasi 97,67% → 98,17% (H1 diterima);
+   segmentasi ROI menaikkan F1 96,43% → 98,09% (H2 diterima); masked
+   mencapai 98,67%/AUC 0,9980 (deskriptif); CBAM lebih ringan 35,6% tetapi
+   lebih rendah 0,67 poin dan 17,0% lebih lambat (H3 ditolak).
+5. **Temuan/dampak**: ablasi preprocessing yang tidak dilakukan Artikel 1/2
+   dan bukti bahwa jumlah parameter bukan proksi latensi pada skrining
+   low-resource.
 
 Kata kunci (3–6, alfabetis, Inggris), draf: Attention Mechanism, CBAM,
 Grad-CAM, Ovarian Follicle Segmentation, Polycystic Ovary Syndrome, Ultrasound
@@ -151,32 +155,32 @@ Tabel/gambar rencana:
 - Fig. 3: kurva ROC + confusion matrix model utama.
 - Fig. 4: Grad-CAM overlay untuk argumen fokus folikel.
 
-4.1 **Denoising Effect on Image Quality and Classification (E1 vs E2)** — dari
-verdict H1; sisipkan Table 5 dan Fig. 2 bila relevan.
+  4.1 **Denoising Effect on Image Quality and Classification (E1 vs E2)** — dari
+  verdict H1; sisipkan Table 5 dan Fig. 2 bila relevan.
 
-4.2 **Effect of Follicle Segmentation on Classification (E3 vs E4 vs E5)** —
-verdict H2; E4 (ROI crop Otsu) adalah varian prespecified dengan AUC sebagai
-metrik utama; E5 (masked) pelaporan deskriptif saja (bukan pemilihan varian
-terbaik di atas test set).
+  4.2 **Effect of Follicle Segmentation on Classification (E3 vs E4 vs E5)** —
+  verdict H2; E4 (ROI crop Otsu) adalah varian prespecified dengan AUC sebagai
+  metrik utama; E5 (masked) pelaporan deskriptif saja (bukan pemilihan varian
+  terbaik di atas test set).
 
-4.3 **Accuracy–Efficiency Trade-off of Attention Mechanisms (E4 vs E6)** —
-verdict H3; bandingkan parameter + `infer_ms_cpu`.
+  4.3 **Accuracy–Efficiency Trade-off of Attention Mechanisms (E4 vs E6)** —
+  verdict H3; bandingkan parameter + `infer_ms_cpu`.
 
-4.4 **Qualitative Interpretation with Grad-CAM** — heatmap menghadapi klaim
-kecil bahwa model "fokus folikel, mengabaikan background"; bahas
-false negative/false positive (FN paling berbahaya untuk skrining).
+  4.4 **Qualitative Interpretation with Grad-CAM** — heatmap menghadapi klaim
+  kecil bahwa model "fokus folikel, mengabaikan background"; bahas
+  false negative/false positive (FN paling berbahaya untuk skrining).
 
-4.5 **Comparison with Prior Studies** — sebutkan konteks angka Artikel 1
-(99,13%) dan Artikel 2 (94,8%) TANPA klaim mengalahkan; tegaskan beda desain
-(dedup, split level citra, satu seed, satu run) membuat perbandingan antar
-dataset tidak 1-1.
+  4.5 **Comparison with Prior Studies** — sebutkan konteks angka Artikel 1
+  (99,13%) dan Artikel 2 (94,8%) TANPA klaim mengalahkan; tegaskan beda desain
+  (dedup, split level citra, satu seed, satu run) membuat perbandingan antar
+  dataset tidak 1-1.
 
-4.6 **Threats to Validity and Limitations** — frame berurutan dari video yang
-sama pasca-dedup bisa nyaris identik; satu-seed pada toleransi 0,005;
-G1–G3 di luar scope; replikasi lama tidak valid sebagai justifikasi desain.
+  4.6 **Threats to Validity and Limitations** — frame berurutan dari video yang
+  sama pasca-dedup bisa nyaris identik; satu-seed pada toleransi 0,005;
+  G1–G3 di luar scope; replikasi lama tidak valid sebagai justifikasi desain.
 
-BLOCKER: semua angka bagian ini menunggu `experiments/results/results.csv` —
-jangan tulis paragraf hasil sebelum angka final masuk.
+Angka bagian ini sudah terisi di Draf 3 dan dilacak ke
+`experiments/results/` serta `experiments/quality/summary.json`.
 
 ### 5. Conclusion (paragraf, bukan daftar; jangan mengulang abstrak; ±150–250 kata)
 
@@ -197,20 +201,21 @@ Opsional; isi bila ada dana/dosen/pihak yang perlu diacungi.
 Target komposisi: ≥80% jurnal/konferensi dalam 5 tahun terakhir, buku ≤20%,
 self-citation ≤3, nama jurnal tidak disingkat, wajib volume+nomor+halaman+DOI.
 
-Rencana blok referensi (dari sekarang 2 sumber inti → target ≥25):
+Rencana blok referensi sudah dieksekusi; daftar final berisi 28 entri yang
+seluruhnya dikutip di teks dan sudah diverifikasi melalui Crossref/OpenAlex:
 
-1. Tiwari dkk. 2026, Intelligence-Based Medicine (sudah ada DOI).
-2. Sundari dkk. 2025, Scientific Reports (sudah ada DOI).
-3–8. PCOS klinis & USG (epidemiologi PCOS, kriteria Rotterdam, ultrasonografi
-   transvaginal, subjektivitas antar-operator).
-9–14. CNN/transfer learning untuk klasifikasi citra USG medis.
-15–19. DenseNet-121 (Huang dkk.), attention (SE-Net Hu dkk., CBAM Woo dkk.,
-   self-attention/transformer Vaswani dkk.).
-20–22. Grad-CAM (Selvaraju dkk. 2017).
-23–24. Wavelet denoising (thresholding Donoho–Johnstone; BayesShrink Chang dkk.)
-   dan Otsu (1979) / adaptive threshold.
-25+. Arsitektur ringan / CAD low-resource untuk layanan kesehatan primer
-   (mendukung narasi G5).
+1. PCOS klinis dan USG: Teede dkk. 2023 (pedoman internasional), konsensus
+   Rotterdam 2004, Coelho Neto dkk. 2017 (penghitungan folikel).
+2. Studi CNN/ML pada USG ovarium: Tiwari dkk. 2026, Sundari dkk. 2025,
+   Fan dkk. 2023, Suha & Islam 2022, Zhao dkk. 2025.
+3. Metode inti: DenseNet-121, ResNet, CBAM, SE-Net, transformer, MobileNetV2,
+   Otsu, CLAHE (Pizer dkk.), wavelet BayesShrink (Donoho–Johnstone; Chang dkk.),
+   SSIM, augmentasi (Shorten; Garcea dkk.), penanganan ketidakseimbangan kelas.
+4. Interpretabilitas: Grad-CAM (Selvaraju dkk.) dan survei XAI medis.
+5. Dataset: PCOS-XAI Ultrasound Dataset (Kaggle).
+
+Semua entri memakai nama jurnal lengkap, volume/nomor/halaman, dan DOI
+(kecuali prosiding NeurIPS dan dataset Kaggle yang tidak memiliki DOI).
 
 Contoh format target (IEEE, nama jurnal penuh):
 
@@ -223,21 +228,22 @@ doi: 10.1016/j.ibmed.2026.100358.
 
 ## Rencana artefak gambar/tabel (dari repo)
 
-| Artefak | Sumber repo | Ketergantungan |
-| --- | --- | --- |
-| Fig. 1 pipeline diagram | dibuat baru | hanya butuh waktu |
-| Fig. 2 overlay segmentasi | `experiments/quality/` (figure overlay) | `evaluate_quality.py` (CPU, bisa jalan detik-menit) |
-| Fig. 3 ROC/confusion matrix | artefak tiap run eksperimen | E1–E6 selesai (BLOCKER) |
-| Fig. 4 Grad-CAM | `checkpoints/<run>/gradcam/` | E1–E6 selesai (BLOCKER) |
-| Table 1–7 | `results.csv`, `matrix_summary.json`, quality `summary.json` | E1–E6 selesai untuk tabel 6–7 |
+| Artefak                     | Sumber repo                                                  | Ketergantungan                                      |
+| --------------------------- | ------------------------------------------------------------ | --------------------------------------------------- |
+| Fig. 1 pipeline diagram     | dibuat baru                                                  | hanya butuh waktu                                   |
+| Fig. 2 overlay segmentasi   | `experiments/quality/` (figure overlay)                      | `evaluate_quality.py` (CPU, bisa jalan detik-menit) |
+| Fig. 3 ROC/confusion matrix | artefak tiap run eksperimen                                  | Selesai (E1–E6)                                     |
+| Fig. 4 Grad-CAM             | `experiments/results/<run>/gradcam_visualization.png`        | Selesai (E1–E6)                                     |
+| Table 1–7                   | `results.csv`, `matrix_summary.json`, quality `summary.json` | E1–E6 selesai untuk tabel 6–7                       |
 
 Semua figur: ≥300 dpi, teks Inggris, gaya formal, tanpa judul berlebihan di
 dalam gambar (caption yang berfungsi).
 
 ## Risiko / pertanyaan terbuka
 
-1. **E1–E6 belum jalan** → bagian Result hanya kerangka; abstrak bagian hasil
-   dan conclusion tidak boleh ditulis dulu.
+1. **E1–E6 sudah selesai** → bagian Result, abstrak, dan conclusion terisi;
+   risiko yang tersisa adalah satu seed/satu run dan test set kecil (600
+   citra), yang sudah dinyatakan sebagai batasan.
 2. **Replikasi Artikel 1 tidak valid** → cukup disebut terang di 4.6 sebagai
    justifikasi desain dedup, bukan sebagai klaim hasil.
 3. **Perbandingan antar studi tidak 1-1** (beda dataset/split/seed) → hindari

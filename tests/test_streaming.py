@@ -19,7 +19,7 @@ _EXPERIMENTS_DIR = Path(__file__).resolve().parent.parent / "experiments"
 if str(_EXPERIMENTS_DIR) not in sys.path:
     sys.path.insert(0, str(_EXPERIMENTS_DIR))
 
-import run_matrix  # type: ignore[reportMissingImports]
+import run_matrix
 
 # Child menulis baris pertama, menunggu berkas gate, baru menulis baris kedua
 # dan keluar dengan kode 3. Gate memungkinkan test membuktikan baris pertama

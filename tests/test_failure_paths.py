@@ -317,7 +317,10 @@ class GradCAMFailurePaths(unittest.TestCase):
         model = _MockBackboneModel().eval()
         with torch.no_grad():
             model.denseblock4.weight.fill_(0.1)
-            model.denseblock4.bias.zero_()
+            bias = model.denseblock4.bias
+            if bias is None:
+                raise AssertionError("Mock backbone harus memiliki bias")
+            bias.zero_()
             model.fc.weight.fill_(-1.0)
             model.fc.bias.zero_()
         input_tensor = torch.ones(1, 3, 32, 32)

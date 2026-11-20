@@ -21,8 +21,8 @@ for _path in (_ROOT, _ROOT / "experiments"):
     if str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 
-import run_matrix  # type: ignore[reportMissingImports]
-from hypotheses import (  # type: ignore[reportMissingImports]
+import run_matrix
+from hypotheses import (
     aggregate_seed_rows,
     evaluate_replicated_hypotheses,
 )
@@ -218,9 +218,7 @@ class LatencyBenchmarkTests(unittest.TestCase):
             {"attention": "cbam", "infer_ms_cpu": 999.0, "total_params": 1},
             {"attention": "se_net", "infer_ms_cpu": 5.0, "total_params": 2},
         ]
-        latency = {
-            "per_attention": {"cbam": {"median_ms": 12.5, "total_params": 42}}
-        }
+        latency = {"per_attention": {"cbam": {"median_ms": 12.5, "total_params": 42}}}
 
         run_matrix.apply_latency(rows, latency)
 
@@ -329,11 +327,7 @@ class AggregateFileTests(unittest.TestCase):
             self._write_seed("42", [row])
             (self.out_root / run_matrix.LATENCY_FILE).write_text(
                 json.dumps(
-                    {
-                        "per_attention": {
-                            "cbam": {"median_ms": 12.5, "total_params": 42}
-                        }
-                    }
+                    {"per_attention": {"cbam": {"median_ms": 12.5, "total_params": 42}}}
                 )
             )
             run_matrix.save_aggregate(self.out_root)

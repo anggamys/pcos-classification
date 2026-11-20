@@ -107,9 +107,7 @@ def sample_images(data_dir: str, samples_per_class: int, seed: int = 42) -> dict
             pada salah satu kelas (path salah, ekstensi lain, atau folder kosong).
     """
     if samples_per_class < 1:
-        raise ValueError(
-            f"samples_per_class harus >= 1, diterima {samples_per_class}"
-        )
+        raise ValueError(f"samples_per_class harus >= 1, diterima {samples_per_class}")
 
     rng = np.random.RandomState(seed)
     picked = {}

@@ -24,7 +24,9 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from io import BufferedReader
 from pathlib import Path
+from typing import cast
 
 import torch
 
@@ -535,6 +537,7 @@ def stream_subprocess(cmd: list, log_path: Path) -> tuple[int, str]:
         stderr=subprocess.STDOUT,
     ) as proc:
         assert proc.stdout is not None
+        stdout = cast(BufferedReader, proc.stdout)
         decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
 
         try:
@@ -542,7 +545,7 @@ def stream_subprocess(cmd: list, log_path: Path) -> tuple[int, str]:
                 # read1 mengembalikan byte yang sudah tersedia tanpa menunggu
                 # buffer 4096 penuh, sehingga progress bar dan log langsung
                 # tampil saat child masih berjalan.
-                raw = proc.stdout.read1(4096)
+                raw = stdout.read1(4096)
 
                 if not raw:
                     break

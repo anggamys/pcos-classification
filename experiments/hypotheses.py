@@ -201,8 +201,7 @@ def aggregate_seed_rows(per_seed_rows: dict) -> tuple[list, list]:
         return [], []
 
     by_seed = {
-        label: {row["id"]: row for row in rows}
-        for label, rows in per_seed_rows.items()
+        label: {row["id"]: row for row in rows} for label, rows in per_seed_rows.items()
     }
     mean_rows = []
     sd_rows = []

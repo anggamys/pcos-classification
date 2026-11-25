@@ -1,7 +1,8 @@
 <!--
 DRAFT NASKAH JUTIF: untuk dipindahkan ke JUTIF-Template.docx saat finalisasi.
-Status      : Draf 3. Hasil E1–E6 terisi; 28 referensi sudah diverifikasi
-              (Crossref/OpenAlex). Sisa: metadata penulis dan konversi DOCX.
+Status      : Draf 4. Hasil E1–E6 terisi; audit near-duplicate, bootstrap CI,
+              dan reframing ROI ovarium selesai; 28 referensi terverifikasi.
+              Sisa: metadata penulis dan konversi DOCX.
 Bahasa      : isi Indonesia (istilah asing yang belum baku ditulis miring);
               judul, abstrak, kata kunci Inggris (wajib JUTIF).
 Konvensi penandaan:
@@ -9,9 +10,9 @@ Konvensi penandaan:
 Sumber konten tunggal: references/kajian-literatur-gap-hipotesis.md
 -->
 
-# Impact of Wavelet Denoising and Follicle Segmentation on PCOS Classification from Ultrasound Images Using Attention-Based DenseNet-121
+# Impact of Wavelet Denoising and Unsupervised Ovarian ROI Generation on PCOS Classification from Ultrasound Images Using Attention-Based DenseNet-121
 
-<!-- 14 kata, <= 20 kata JUTIF. Alternatif di outline jika ingin fokus G4. -->
+<!-- 18 kata, <= 20 kata JUTIF. Alternatif di outline jika ingin fokus G4. -->
 
 **Nama Penulis 1\*, Nama Penulis 2**
 _[FILL: nama tanpa gelar; tanda \* pada penulis korespondensi]_
@@ -19,9 +20,9 @@ _[FILL: nama tanpa gelar; tanda \* pada penulis korespondensi]_
 _Department of Informatics, Jenderal Soedirman University, Indonesia_
 Email: [FILL: email penulis korespondensi saja]
 
-**Abstract.** Polycystic ovary syndrome (PCOS) diagnosis from ultrasound imaging remains highly operator-dependent. Recent deep learning studies apply attention without isolating the effect of preprocessing and without comparing attention mechanisms. This study measures the effect of wavelet denoising (BayesShrink) and unsupervised follicle segmentation on the diagnostic performance of DenseNet-121 with attention, and compares self-attention against CBAM in terms of accuracy and efficiency. Six configurations (E1–E6) were evaluated on the PCOS-XAI Ultrasound Dataset, which after byte-identical deduplication contains 3,996 unique images (a 4:1 class imbalance handled by pos-weighted binary cross-entropy) split 70/15/15 (2,797/599/600) with a fixed seed. Accuracy, F1-score, specificity, and AUC were measured, complemented by Grad-CAM visual interpretation. Wavelet denoising increased accuracy from 97.67% (E1) to 98.17% (E2) and AUC from 0.9968 to 0.9976. Follicle segmentation increased AUC from 0.9970 (E3) to 0.9971 (E4) and F1-score from 96.43% to 98.09%, while masked input performed best overall (98.67% accuracy, AUC 0.9980). CBAM used 35.6% fewer parameters (7.35 M vs 11.42 M) but was 0.67 percentage points less accurate and 17% slower on CPU, so the efficiency hypothesis was rejected. The results quantify the contribution of each preprocessing step, which earlier PCOS studies did not isolate, and show that fewer parameters do not necessarily mean lower inference cost.
+**Abstract.** Polycystic ovary syndrome (PCOS) classification from ultrasound images remains operator-dependent, and recent deep learning studies apply attention without isolating preprocessing effects or comparing attention mechanisms. This study measures the effect of wavelet denoising (BayesShrink) and unsupervised dark-region ovarian ROI generation on DenseNet-121 with attention, and compares self-attention against CBAM in accuracy and inference cost. Six configurations (E1–E6) were evaluated on the PCOS-XAI Ultrasound Dataset. After byte-identical deduplication, 3,996 unique images (3,184 PCOS, 812 healthy) were split 70/15/15 (2,797/599/600) with a fixed seed; the test set contains 479 PCOS and 121 healthy images. Accuracy, F1-score, specificity, and AUC were measured with bootstrap confidence intervals, complemented by a perceptual-hash near-duplicate audit and Grad-CAM inspection. Denoising raised accuracy from 97.67% (E1) to 98.17% (E2), although the paired interval includes zero. ROI cropping raised accuracy from 94.50% (E3) to 97.00% (E4) and F1 from 96.43% to 98.09%, while masked input performed best (98.67% accuracy, AUC 0.9980). CBAM used 35.6% fewer parameters (7.35 M vs 11.42 M) but was 0.67 percentage points less accurate and 17% slower on CPU, so the efficiency hypothesis was rejected. The audit found that 56.7% of test images have a perceptually close training neighbour against a 0.19% random-pair baseline; on the 157 least-similar images, accuracy remained between 96.2% and 98.1%, but the ROI advantage was no longer statistically separable. The results quantify preprocessing contributions that earlier PCOS studies did not isolate and show that fewer parameters do not imply lower inference cost.
 
-**Keywords:** attention mechanism; CBAM; deep learning; follicle segmentation; polycystic ovary syndrome; ultrasound classification
+**Keywords:** attention mechanism; CBAM; deep learning; ovarian ROI generation; polycystic ovary syndrome; ultrasound classification
 
 ---
 
@@ -36,7 +37,7 @@ hiperandrogenisme, dan morfologi ovarium polikistik pada
 ultrasonografi [2]. Pada praktik lapangan, USG
 transvaginal menjadi pemeriksaan utama, tetapi kualitas interpretasinya
 bergantung pada operator: citra yang sama dapat dibaca berbeda oleh sonografer
-berbeda, dan folikel perifer berukuran 2–9 mm mudah terlewat bila disiplin
+berbeda, dan struktur ovarium berukuran 2-9 mm mudah terlewat bila disiplin
 teknik tidak konsisten [3]. Ketidakstabilan
 ini menjadi kendala ketika PCOS harus disaring di layanan primer dengan
 peralatan dan tenaga terbatas.
@@ -74,15 +75,18 @@ Tujuan penelitian dirumuskan dalam tiga pertanyaan yang saling terkait:
 
 1. Seberapa besar pengaruh _wavelet denoising_ (BayesShrink) terhadap kualitas
    citra USG ovarium dan performa klasifikasi?
-2. Apakah input hasil segmentasi folikel yang unsupervised (ROI ter-crop atau
-   citra ber-mask) meningkatkan kinerja klasifikasi dibanding citra penuh?
+2. Apakah input dari ROI ovarium yang dibangkitkan secara unsupervised
+   (ROI ter-crop atau citra ber-mask) meningkatkan kinerja klasifikasi
+   dibanding citra penuh?
 3. Mekanisme attention mana yang memberi trade-off lebih baik antara
    akurasi dan efisiensi: self-attention atau CBAM?
 
 Untuk menjawabnya, penelitian ini merancang matriks enam eksperimen (E1–E6)
 di atas DenseNet-121 + attention pada dataset raw yang sudah dibersihkan
-dedup. Tiga pertanyaan tersebut dijawab melalui pasangan eksperimen dengan
-kriteria keberhasilan yang prespecified dan diuraikan pada Subbab 3.6.
+dedup, ditambah audit kemiripan perseptual untuk menguji ketahanan hasil
+terhadap near-duplicate yang lolos deduplikasi byte. Tiga pertanyaan tersebut
+dijawab melalui pasangan eksperimen dengan kriteria keberhasilan yang
+prespecified dan diuraikan pada Subbab 3.6.
 
 ## 2. Studi Terkait Klasifikasi PCOS dari Citra Ultrasonografi
 
@@ -94,10 +98,10 @@ dan pertanyaan attention yang diuji di sini.
 
 **Table 1. Perbandingan studi terkait PCOS dari citra ultrasonografi.**
 
-| Studi                                                     | Metode                                                                     | Preprocessing                                     | Attention                  | Ablasi                 | Dataset                               | Validasi eksternal | Pengukuran efisiensi     |
-| --------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------- | ---------------------- | ------------------------------------- | ------------------ | ------------------------ |
-| Tiwari dkk. [4]                                           | 4 backbone (kustom, VGG19, DenseNet-121, EfficientNet-B0) + self-attention | BayesShrink + Gaussian smoothing (tanpa ablation) | Self-attention             | Backbone saja          | PCOS-XAI, 11.784 citra                | Tidak ada          | Tidak ada latensi/memori |
-| Sundari dkk. [5]                                          | Enhanced EfficientNet-B3 + attention, Bayesian Optimization                | Segmentasi sederhana + SMOTE pada fitur klinis    | Satu varian, tidak dirinci | Attention + augmentasi | PCOSGen (~3.200 citra) + fitur klinis | Tidak ada          | Tidak ada                |
+| Studi            | Metode                                                                     | Preprocessing                                     | Attention                  | Ablasi                 | Dataset                               | Validasi eksternal | Pengukuran efisiensi     |
+| ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------- | -------------------------- | ---------------------- | ------------------------------------- | ------------------ | ------------------------ |
+| Tiwari dkk. [4]  | 4 backbone (kustom, VGG19, DenseNet-121, EfficientNet-B0) + self-attention | BayesShrink + Gaussian smoothing (tanpa ablation) | Self-attention             | Backbone saja          | PCOS-XAI, 11.784 citra                | Tidak ada          | Tidak ada latensi/memori |
+| Sundari dkk. [5] | Enhanced EfficientNet-B3 + attention, Bayesian Optimization                | Segmentasi sederhana + SMOTE pada fitur klinis    | Satu varian, tidak dirinci | Attention + augmentasi | PCOSGen (~3.200 citra) + fitur klinis | Tidak ada          | Tidak ada                |
 
 Kedua artikel berhenti pada satu varian attention, tanpa ablation
 preprocessing, dan tanpa pengukuran deployment. Keduanya juga mencatat
@@ -105,27 +109,28 @@ keterbatasan yang serupa: validasi hanya internal pada satu dataset, dan
 laporan hanya memuat metrik _point-estimate_ tanpa interval kepercayaan
 maupun kuantifikasi ketidakpastian. Penelitian ini menangani tiga hal yang
 dapat dikerjakan tuntas dengan sumber daya yang ada: mengablasi efek
-BayesShrink, menguji keunggulan fokus folikel eksplisit lewat segmentasi
+BayesShrink, menguji fokus area ovarium eksplisit lewat pembangkitan ROI
 unsupervised, dan membandingkan dua mekanisme attention dengan pengukuran
 latensi. Tiga persoalan yang tidak terjawab (multimodal, cross-dataset, dan
 ketidakpastian) dinyatakan eksplisit sebagai batasan dan arah lanjutan.
 
-## 3. Metode: Pipeline Klasifikasi PCOS Berfokus Folikel dengan Attention
+## 3. Metode: Pipeline Klasifikasi PCOS Berbasis ROI Ovarium dengan Attention
 
 Secara runtut, citra USG melewati: deduplikasi → preprocessing (resize,
-opsional CLAHE, opsional BayesShrink) → pembuatan mask folikel unsupervised
-dan konversi ke salah satu mode input → DenseNet-121 + modul attention
-terpilih → evaluasi metrik dan Grad-CAM. Seluruh komponen diuraikan pada
-Subbab 3.1 sampai 3.5, sedangkan desain eksperimen dan hipotesis pada
-Subbab 3.6.
+opsional CLAHE, opsional BayesShrink) → pembangkitan mask kandidat area
+gelap secara unsupervised dan konversi ke salah satu mode input →
+DenseNet-121 + modul attention terpilih → evaluasi metrik, audit kemiripan,
+dan Grad-CAM. Seluruh komponen diuraikan pada Subbab 3.1 sampai 3.5,
+sedangkan desain eksperimen dan hipotesis pada Subbab 3.6.
 
 ### 3.1. Dataset dan Deduplikasi
 
 Dataset yang dipakai adalah PCOS-XAI Ultrasound Dataset dari Kaggle [9]
 dengan 11.784 citra mentah: 6.784 PCOS dan 5.000 sehat. Dataset ini memuat
 persoalan dunia nyata seperti resolusi campuran, duplikasi byte-level, dan
-ketimpangan kelas, namun tidak menyediakan mask ground-truth folikel maupun
-metadata pasien yang memungkinkan split level pasien.
+ketimpangan kelas, namun tidak menyediakan mask ground-truth ovarium maupun
+struktur ovarium, serta tidak menyediakan metadata pasien yang memungkinkan split level
+pasien.
 
 Sebelum split, salinan byte-identik dibuang dengan hashing md5 (strategi
 _keep-first_) karena split acak level citra bisa menempatkan salinan yang
@@ -133,11 +138,14 @@ sama pada train sekaligus test dan menggelembungkan metrik secara artifisial.
 Urgensi deduplikasi terbukti pada replikasi awal tanpa dedup: 81% citra
 test set memiliki salinan identik di train, sehingga metrik yang sangat
 tinggi (mis. akurasi 99.72%) merupakan tanda kebocoran data [dibahas pada
-Subbab 4.6]. Hasil dedup:
-3.996 citra unik (3.184 PCOS dan 812 sehat) tanpa duplikasi lintas kelas,
-seperti disajikan pada Table 2. Split 70/15/15 dengan seed 42 menghasilkan
-2.797 citra latih, 599 validasi, dan 600 uji (478 PCOS, 122 sehat); total
-7.788 salinan identik dihapus. Konsekuensinya rasio kelas menjadi 4:1,
+Subbab 4.5]. Hasil dedup:
+3.996 citra unik (3.184 PCOS dan 812 sehat) tanpa salinan byte-identik
+lintas kelas, seperti disajikan pada Table 2. Split 70/15/15 dengan seed 42
+menghasilkan
+2.797 citra latih, 599 validasi, dan 600 uji (479 PCOS, 121 sehat); total
+7.788 salinan identik dihapus. Deduplikasi md5 hanya menangani salinan
+byte-identik; kemiripan perseptual yang tersisa diukur pada Subbab 4.5.
+Konsekuensinya rasio kelas menjadi 4:1,
 sehingga akurasi saja menyesatkan; spesifisitas, F1, dan AUC harus dilaporkan
 bersamaan, dan ketimpangan ini ditangani secara prespecified di semua
 eksperimen lewat pos-weighted BCE (Subbab 3.5) tanpa resampling data.
@@ -159,23 +167,31 @@ histogram equalization_) [11] dan/atau wavelet denoising
 BayesShrink [12], [13]. Gambar 1 mengilustrasikan alur end-to-end dari tahap
 pemrosesan awal hingga evaluasi model.
 
-![Gambar 1. Diagram alur sistem klasifikasi PCOS berbasis DenseNet-121 dengan prapemrosesan wavelet, segmentasi folikel, dan mekanisme attention.](figures/fig1_pipeline.png)
+![Gambar 1. Diagram alur sistem klasifikasi PCOS berbasis DenseNet-121 dengan prapemrosesan wavelet, pembangkitan ROI ovarium unsupervised, dan mekanisme attention.](figures/fig1_pipeline.png)
 
-**Gambar 1. Diagram alur sistem klasifikasi PCOS berbasis DenseNet-121 dengan prapemrosesan wavelet, segmentasi folikel, dan mekanisme attention.**
+**Gambar 1. Diagram alur sistem klasifikasi PCOS berbasis DenseNet-121 dengan prapemrosesan wavelet, pembangkitan ROI ovarium unsupervised, dan mekanisme attention.**
 
 Denoising wavelet menerapkan soft thresholding pada koefisien detail setiap
-subband. Varian noise diestimasi dari subband HH melalui _median absolute
-deviation_:
+subband. Varian noise diestimasi dari subband HH level terhalus (HH1) melalui
+_median absolute deviation_ pada Persamaan (1):
 
 σ̂ = median(|w ∈ HH|) / 0.6745 (1)
 
-Ambang adaptif tiap subband j selanjutnya dihitung dari varian noise dan
-sebaran koefisien subband tersebut:
+Ambang adaptif tiap subband j dihitung dari varian noise dan estimasi varian
+sinyal subband tersebut. Estimasi standar deviasi sinyal dinyatakan pada
+Persamaan (2), dan ambang subband pada Persamaan (3):
 
-T\_j = σ̂² / σ\_{w,j} (2)
+σ̂\_{x,j} = √(max(mean(w_j²) − σ̂², 0)) (2)
 
-dengan w adalah koefisien detail subband HH, σ̂ estimasi standar deviasi
-noise, dan σ\_{w,j} standar deviasi koefisien subband j.
+T_j = σ̂² / σ̂\_{x,j} (3)
+
+dengan w_j koefisien detail subband j, σ̂ estimasi standar deviasi noise dari
+subband HH1, dan σ̂\_{x,j} estimasi standar deviasi sinyal pada subband j.
+Nilai max(·, 0) mencegah varian negatif pada subband yang didominasi noise,
+dan implementasi memberi lantai 1e-10 pada σ̂\_{x,j} agar pembagian tetap
+terdefinisi. Momen kedua mean(w_j²) dipakai sebagai aproksimasi varian karena
+koefisien detail subband hampir bermean nol; selisihnya kecil untuk citra USG
+yang telah dinormalisasi.
 
 Dua metrik deskriptif sisi pengolahan citra menyertai tahap ini:
 _peak signal-to-noise ratio_ (PSNR) dan _structural similarity_
@@ -185,30 +201,41 @@ besar citra berubah akibat denoising, bukan seberapa baik kualitas citra
 tersebut, sehingga dilaporkan sebagai bukti deskriptif sisi PCD dan bukan
 penentu verdict hipotesis (kriteria verdict pada Subbab 3.6).
 
-### 3.3. Segmentasi Folikel Unsupervised dan Mode Input
+### 3.3. Pembangkitan ROI Ovarium Unsupervised dan Mode Input
 
-Berbeda dari studi pendahulu yang menyandarkan fokus folikel pada
-attention implisit, penelitian ini menguji fokus eksplisit lewat segmentasi
-sebagai tahap prapemrosesan. Mask folikel dibangun dengan pendekatan unsupervised:
-threshold Otsu [15] atau adaptif, diikuti operasi morfologi (opening, filling
-holes) dan penghapusan komponen yang menyentuh batas citra. Jika Otsu hanya
-menangkap background sebagai objek, yang ditandai coverage mask melebihi
-50%, sistem berfallback ke threshold persentil gelap.
+Berbeda dari studi pendahulu yang mengandalkan attention sebagai mekanisme
+fokus, penelitian ini menguji fokus eksplisit lewat mask kandidat area gelap
+sebagai tahap prapemrosesan. Mask dibangun dengan
+pendekatan unsupervised: threshold Otsu [15] atau adaptif pada citra
+grayscale, diikuti operasi morfologi (opening, closing, filling holes),
+pembuangan komponen yang menyentuh batas citra, dan penyaringan region
+dengan luas minimum 80 piksel. Jika Otsu menangkap background sebagai objek,
+yang ditandai coverage mask melebihi 50%, sistem berfallback ke threshold
+persentil gelap ke-15. Mask dihitung pada kanvas kerja 224×224 agar ambang
+piksel konsisten antar resolusi, lalu di-upscale ke ukuran asli.
+
+Perlu ditegaskan bahwa prosedur ini adalah detektor area gelap, bukan
+detektor area gelap. Folikel USG tampak hipoekoik, tetapi background
+dan bayangan akustik juga gelap, sehingga mask dapat mencakup area di luar
+ovarium. Karena dataset tidak menyediakan mask ground-truth, tidak ada
+klaim bahwa mask berkorespondensi satu-satu dengan ROI ovarium; Subbab 4.1 dan
+4.2 menunjukkan bahwa mask lebih tepat dibaca sebagai pembatas area
+gelap/ovarium yang menekan background.
 
 Tiga mode input membedakan seberapa kuat fokus eksplisit itu diberikan:
 **full** (citra penuh tanpa modifikasi spatial), **roi** (_crop_ ke bounding
-box mask ditambah padding 8 piksel lalu di-resize kembali), dan **masked**
-(citra penuh, area di luar mask digelapkan). Opsi-opsi tersebut
-dirangkum pada Table 3; ketiganya dilatih dengan split dan seed yang sama
-agar perbandingan setara.
+box gabungan seluruh region mask ditambah padding 8 piksel lalu di-resize
+kembali), dan **masked** (citra penuh, area di luar mask digelapkan).
+Opsi-opsi tersebut dirangkum pada Table 3; ketiganya dilatih dengan split
+dan seed yang sama agar perbandingan setara.
 
-**Table 3. Mode input hasil segmentasi.**
+**Table 3. Mode input hasil pembangkitan ROI.**
 
-| Mode   | Sumber piksel                                      | Efek pada model                                     |
-| ------ | -------------------------------------------------- | --------------------------------------------------- |
-| full   | Citra penuh                                        | Model mempelajari citra plus background aslinya     |
-| roi    | Bounding box mask + padding 8 px, di-resize ke 224 | Zoom ke area ovarium/folikel                        |
-| masked | Citra penuh dengan area di luar mask digelapkan    | Proporsi asli dipertahankan, background dieliminasi |
+| Mode   | Sumber piksel                                               | Efek pada model                                     |
+| ------ | ----------------------------------------------------------- | --------------------------------------------------- |
+| full   | Citra penuh                                                 | Model mempelajari citra plus background aslinya     |
+| roi    | Bounding box gabungan mask + padding 8 px, di-resize ke 224 | Zoom ke area gelap kandidat ovarium                 |
+| masked | Citra penuh dengan area di luar mask digelapkan             | Proporsi asli dipertahankan, background dieliminasi |
 
 Pada mode masked, intensitas piksel di luar area mask segmentasi dinolkan
 (diberikan nilai nol atau latar belakang hitam) tanpa mengubah ukuran spasial
@@ -223,26 +250,28 @@ DenseNet-121 dipilih di antara arsitektur CNN dalam seperti keluarga residual
 Di atas backbone dipasang head fully-connected dengan dropout 0.3.
 
 Empat varian modul attention dibandingkan, semuanya ditempatkan pada peta
-fitur sebelum pooling global. Self-attention (11.4 juta parameter) [4] memakai
-proyeksi Q, K, V multi-head pada token spasial. Token fitur spasial berdimensi
-(B, H·W, C), sehingga untuk input 224 piksel dengan H = W = 7 terdapat
-N = 49 token:
+fitur sebelum pooling global. Model dengan self-attention (11.4 juta
+parameter total) [4] memakai proyeksi Q, K, V multi-head pada token spasial.
+Token fitur spasial berdimensi (B, H·W, C), sehingga untuk input 224 piksel
+dengan H = W = 7 terdapat N = 49 token. Perhitungan attention mengikuti
+Persamaan (4):
 
-  Attention(Q, K, V) = softmax(QKᵀ / √d_k) · V (3)
+Attention(Q, K, V) = softmax(QKᵀ / √d_k) · V (4)
 
-Modul ini dipasang pada token spasial 7×7 sebelum pooling. CBAM (7.3 juta
-parameter) [19] menerapkan channel attention lalu spatial attention secara
-berturut-turut pada peta fitur (B, C, H, W). SE-Net (7.3 juta parameter) [20]
-hanya memakai attention kanal dan tidak dimasukkan ke matriks eksperimen
-utama. Transformer-attention (32.4 juta parameter) [21] berbasis patch token
-dan berada di luar scope utama karena bobotnya jauh lebih besar serta tidak
-lolos klaim ringan yang diuji H3.
+Modul ini dipasang pada token spasial 7×7 sebelum pooling. Model dengan CBAM
+(7.3 juta parameter total) [19] menerapkan channel attention lalu spatial
+attention secara berturut-turut pada peta fitur (B, C, H, W). SE-Net
+(7.3 juta parameter total) [20] hanya memakai attention kanal dan tidak
+dimasukkan ke matriks eksperimen utama. Transformer-attention (32.4 juta
+parameter total) [21] berbasis patch token dan berada di luar scope utama
+karena bobotnya jauh lebih besar serta tidak lolos klaim ringan yang diuji
+H3.
 
 Untuk perbandingan antar mekanisme attention hanya dua kandidat yang
 diangkat: self-attention (replikasi Artikel 1) dan CBAM (kandidat ringan yang
-memberi spatial attention relevan dengan folikel). Kedua mekanisme attention
+memberi spatial attention relevan dengan area ovarium). Kedua mekanisme attention
 ini diintegrasikan ke dalam arsitektur DenseNet-121 untuk mengevaluasi
-trade-off antara akurasi diagnostik, jumlah parameter, dan latensi inferensi.
+trade-off antara akurasi klasifikasi, jumlah parameter, dan latensi inferensi.
 Sebagai pembanding efisiensi di tingkat backbone, MobileNetV2 menunjukkan
 bahwa inverted residual dan linear bottleneck dapat menekan biaya komputasi
 tanpa mengorbankan akurasi secara berarti [22].
@@ -259,10 +288,10 @@ Split 70/15/15 dengan seed 42 untuk split, shuffle, augmentasi, dan
 inisialisasi model, sehingga semua eksperimen sebanding dan reprodusibel.
 
 Ketimpangan kelas 4:1 ditangani dengan pos_weight pada
-BCEWithLogitsLoss. Variabel w di Persamaan (4) di-set ke rasio
+BCEWithLogitsLoss. Variabel w di Persamaan (5) di-set ke rasio
 n_negatif/n_positif yang dihitung hanya dari split train:
 
-ℓ = (1/N) Σ [ −w · yᵢ · log pᵢ − (1−yᵢ) · log(1−pᵢ) ] (4)
+ℓ = (1/N) Σ [ −w · yᵢ · log pᵢ − (1−yᵢ) · log(1−pᵢ) ] (5)
 
 dengan yᵢ biner label kelas positif (PCOS) dan pᵢ peluang prediksi. Pendekatan
 ini menyeimbangkan gradien kedua kelas tanpa mengubah distribusi data,
@@ -274,10 +303,12 @@ seragam pada seluruh eksperimen.
 ### 3.6. Hipotesis, Matriks Eksperimen, dan Metrik Evaluasi
 
 Hipotesis dirumuskan sebagai pasangan H0/H1 dengan kriteria keberhasilan
-deskriptif, bukan uji signifikansi formal. Desain memakai satu split dan satu
-run per eksperimen sehingga uji signifikansi formal tidak valid; batasan ini
-dinyatakan sejak awal untuk menghindari kesimpulan berlebihan. Table 4
-memetakan enam konfigurasi eksperimen ke hipotesis.
+yang ditetapkan sebelum evaluasi. Verdict utama tetap deskriptif mengikuti
+aturan tersebut. Karena desain hanya memakai satu split dan satu run, uji
+signifikansi formal untuk generalisasi lintas pelatihan tidak dapat
+dilakukan; sebagai analisis sekunder, ketidakpastian sampling test diukur
+dengan bootstrap dan McNemar, dan hasilnya tidak mengubah verdict
+prespecified. Table 4 memetakan enam konfigurasi eksperimen ke hipotesis.
 
 **Table 4. Matriks eksperimen E1–E6 dan pemetaan hipotesis.**
 
@@ -294,41 +325,67 @@ Kriteria keberhasilan setiap hipotesis ditetapkan sebelum eksperimen
 dievaluasi agar penilaian tidak bergantung pada hasil yang teramati. H1
 (denoising) diterima bila akurasi atau AUC E2 lebih tinggi secara ketat dari
 E1 pada minimal satu metrik tanpa regresi lebih dari 0.005 pada metrik
-satunya; hasil identik tidak dihitung diterima. H2 (segmentasi) memakai E4
-(ROI crop Otsu) sebagai varian utama dengan AUC sebagai metrik utama, dan
+satunya; hasil identik tidak dihitung diterima. H2 (pembangkitan ROI) memakai
+E4 (ROI crop Otsu) sebagai varian utama dengan AUC sebagai metrik utama, dan
 diterima bila AUC E4 > E3 serta F1 E4 tidak lebih buruk melebihi 0.005. E5
 (masked) dilaporkan sebagai pembanding sekunder dan tidak menentukan verdict,
 sehingga tidak ada pemilihan varian terbaik di atas test set. H3 (efisiensi
 attention) diterima bila akurasi dan AUC E6 tidak turun lebih dari 0.005 dari
 E4, jumlah parameter lebih sedikit, dan latensi tidak lebih besar. Toleransi
 0.005 berada dekat rentang noise run-to-run pada satu seed; konsekuensinya
-dimuat sebagai batasan pada Subbab 4.6.
+dimuat sebagai batasan pada Subbab 4.7. Karena AUC pada dataset ini mendekati
+plafon, akurasi dan F1 tetap dilaporkan sebagai metrik pendamping dan dipakai
+untuk menilai kekuatan bukti, tanpa mengubah kriteria verdict.
 
-Metrik evaluasi sisi diagnostik meliputi accuracy, precision, recall,
+Metrik evaluasi sisi klasifikasi meliputi accuracy, precision, recall,
 F1-score, specificity, dan AUC, dilengkapi confusion matrix dan kurva ROC.
 Karena H3 mencakup dimensi efisiensi komputasi, jumlah parameter model dan
 latensi inferensi pada prosesor CPU (dalam milidetik per sampel) turut
-diukur. Evaluasi sisi pengolahan citra (PSNR, SSIM, serta statistik ROI yang
+diukur. Latensi diukur terpisah dari preprocessing: setiap model dibangun
+tanpa bobot pralatih, diuji pada input acak berukuran batch 1 × 3 × 224 × 224,
+dipanaskan dengan 3 forward, lalu diukur dalam 5 putaran yang masing-masing
+memuat 20 forward secara bergantian antar model. Angka yang dilaporkan adalah
+median dari 5 putaran; pengukuran bergantian mengurangi bias kondisi CPU.
+Identitas CPU dan jumlah thread tidak tersimpan pada artefak yang
+dipublikasikan, sehingga angka latensi hanya sah dibandingkan antar model
+pada sesi pengukuran yang sama, bukan sebagai benchmark perangkat.
+
+Evaluasi sisi pengolahan citra (PSNR, SSIM, serta statistik ROI yang
 mencakup jumlah region, cakupan area, luas rata-rata, dan luas maksimum) dan
 visualisasi overlay mask dijalankan secara deterministik pada tahap
 prapemrosesan, sehingga bebas dari variabilitas pelatihan model. Keputusan
 akhir H1–H3 ditarik dari aturan kuantitatif yang telah ditentukan.
 
+Interval kepercayaan 95% dihitung dengan bootstrap persentil dari 5.000
+resample pada level citra uji. Untuk selisih pasangan, resample yang sama
+diterapkan pada kedua model agar korelasinya terjaga. Uji McNemar eksak
+dipakai pada pasangan prediksi yang discordant. Prosedur ini hanya menangkap
+variabilitas sampling test set, bukan variabilitas inisialisasi atau
+pelatihan, sehingga CI tidak boleh dibaca sebagai bukti replikasi. Audit
+near-duplicate memakai perceptual hash 64-bit (grayscale 32×32, DCT dua
+dimensi, 8×8 koefisien frekuensi rendah, median sebagai ambang) dan jarak
+Hamming minimum setiap citra uji ke seluruh citra latih, lalu dibandingkan
+dengan baseline pasangan acak; prosedur dan hasilnya diuraikan pada
+Subbab 4.5.
+
 Empat batasan desain yang disebut sejak awal: (a) tidak ada mask
-ground-truth, sehingga segmentasi berperan sebagai penyedia ROI dan bukan
-pengukuran Dice klinis; (b) satu seed dan satu run per eksperimen, sehingga
-perbandingan bersifat deskriptif; (c) split level citra, bukan pasien/video,
-sehingga frame berurutan dari perekaman yang sama bisa nyaris identik meski
-lolos md5; (d) kuota komputasi Colab membatasi replikasi multi-seed.
+ground-truth, sehingga mask berperan sebagai pembatas area gelap/penyedia ROI
+dan bukan pengukuran Dice klinis; (b) satu seed dan satu run per eksperimen,
+sehingga perbandingan bersifat deskriptif; (c) split level citra, bukan
+pasien/video, sehingga frame berurutan dari perekaman yang sama bisa nyaris
+identik meski lolos md5; (d) kuota komputasi Colab membatasi replikasi
+multi-seed.
 
 ## 4. Hasil dan Pembahasan
 
 Seluruh metrik performa yang dilaporkan pada bab ini diperoleh dari pengujian
-pada subset uji independen (test set) yang tidak pernah dilihat model selama
-pelatihan. Setiap konfigurasi eksperimen dilatih menggunakan seed pengacakan
-tetap (seed 42) pada akselerator GPU Tesla T4. Test set berisi 600 citra
-(478 PCOS, 122 sehat), sehingga satu kesalahan klasifikasi setara dengan 0.17
-poin persentase akurasi.
+pada 600 citra uji yang tidak dipakai saat pelatihan. Setiap konfigurasi
+eksperimen dilatih menggunakan seed pengacakan tetap (seed 42) pada
+akselerator GPU Tesla T4. Subset ini bukan test set independen secara ketat:
+audit pada Subbab 4.5 menunjukkan bahwa sebagian besar citra uji memiliki
+tetangga perseptual di split latih. Test set berisi 479 PCOS dan 121 citra
+sehat, sehingga satu kesalahan klasifikasi setara dengan 0.17 poin
+persentase akurasi.
 
 ### 4.1. Denoising terhadap Kualitas Citra dan Klasifikasi (E1 vs E2)
 
@@ -340,13 +397,24 @@ Sebaliknya, CLAHE mengubah histogram secara agresif: PSNR turun ke
 pada rentang 0.74–0.77. Segmentasi Otsu menghasilkan rata-rata 10.2 region
 per citra, dengan coverage 28.49% pada kelas PCOS dan 38.53% pada kelas
 sehat; Gambar 2 memperlihatkan overlay mask pada satu citra per kelas.
+Pola coverage ini penting untuk interpretasi. Kelas sehat justru memiliki
+coverage lebih besar dan luas region maksimum hampir dua kali lipat
+(14.425 vs 7.614 piksel). Jika mask menangkap region gelap/ovarium, arahnya seharusnya
+berlawanan karena ovarium PCOS umumnya memuat struktur gelap lebih banyak [3].
+Gambar 2 juga memperlihatkan mask yang mencakup background gelap dan tepi
+citra, terutama pada sampel sehat. Mask karena itu dibaca sebagai pembatas
+area gelap/ovarium, bukan delineasi folikel.
 
 Pada sisi klasifikasi, denoising meningkatkan performa secara konsisten
 namun kecil: akurasi E2 98.17% berbanding E1 97.67% (+0.50 poin persentase),
 AUC 0.9976 berbanding 0.9968 (+0.0008), dan F1 98.84% berbanding 98.52%;
 spesifisitas tetap 100% pada keduanya. Kriteria H1 mensyaratkan E2 lebih
 tinggi ketat pada akurasi atau AUC tanpa regresi melebihi 0.005 pada metrik
-lainnya; kedua syarat tersebut terpenuhi, sehingga **H1 diterima**.
+lainnya; kedua syarat tersebut terpenuhi, sehingga **H1 diterima**. Bukti
+ini lemah secara statistik: selisih akurasi +0.51 poin persentase memiliki
+95% CI [−0.50, +1.67] dan uji McNemar pada prediksi discordant memberi
+p = 0.55. Verdict dipertahankan karena aturan prespecified, bukan karena
+selisihnya terpisah dari noise.
 
 Perubahan citra yang kecil sejalan dengan manfaat yang kecil. BayesShrink
 hanya mengubah citra pada tingkat PSNR ±51 dB, yang berarti perubahan
@@ -379,32 +447,39 @@ bukan manfaat diskriminatif.
 
 **Gambar 2. Contoh keluaran prapemrosesan pada satu citra per kelas (kiri ke kanan: citra asli, denoised BayesShrink, CLAHE, dan overlay mask Otsu): (a) kelas PCOS dan (b) kelas kontrol sehat.**
 
-### 4.2. Segmentasi Folikel terhadap Klasifikasi (E3 vs E4 vs E5)
+### 4.2. Pembangkitan ROI Ovarium terhadap Klasifikasi (E3 vs E4 vs E5)
 
 Verdict H2 diuji melalui E4 (ROI crop Otsu) sebagai varian prespecified
 dibanding E3. AUC E4 0.9971 hanya 0.0001 lebih tinggi dari E3 0.9970, tetapi
 F1 naik dari 96.43% ke 98.09% (+1.66 poin) dan akurasi dari 94.50% ke
-97.00%; karena F1 tidak mengalami regresi melebihi 0.005, **H2 diterima**.
-Margin AUC yang sangat tipis berada dalam rentang noise satu run, sehingga
-kekuatan bukti H2 terutama berasal dari perbaikan F1 dan akurasi, bukan dari
-AUC. E5 (masked), yang dilaporkan sebagai pembanding deskriptif dan tidak
-menentukan verdict, mencapai performa terbaik keseluruhan: akurasi 98.67%,
-F1 99.16%, dan AUC 0.9980, dengan spesifisitas 97.52% (3 dari 122 citra sehat
-salah diklasifikasi).
+97.00%; karena AUC tetap lebih tinggi dan F1 tidak mengalami regresi
+melebihi 0.005, **H2 diterima** secara formal. AUC sendiri tidak informatif:
+selisihnya memiliki 95% CI [−0.0008, +0.0013]. Bukti H2 berasal dari
+akurasi (+2.51 poin persentase, CI [0.67, 4.33]) dan F1 (+1.66 poin,
+CI [0.44, 2.89]), dengan McNemar p = 0.011 pada prediksi discordant.
+E5 (masked), yang dilaporkan sebagai pembanding deskriptif dan tidak
+menentukan verdict, mencapai performa tertinggi: akurasi 98.67%,
+F1 99.16%, dan AUC 0.9980, dengan spesifisitas 97.52% (3 dari 121 citra
+sehat salah diklasifikasi). Dibanding E4, E5 menambah akurasi +1.69 poin
+persentase (CI [0.33, 3.17]) dan F1 +1.09 poin (CI [0.22, 2.09]);
+McNemar p = 0.0414.
 
-Pola hasil ini konsisten dengan mekanisme fokus eksplisit. E3 adalah kondisi
-terburuk (94.50%) karena CLAHE memperkuat speckle tanpa menghilangkan
-background; ROI crop memulihkan performa ke 97.00% dengan memusatkan
-resolusi 224×224 pada area folikel, sedangkan masked input memberi
-keuntungan terbesar (98.67%) karena mempertahankan proporsi anatomi
-sekaligus menekan background. Konsekuensi masked adalah munculnya tiga
-false positive, yang menjelaskan spesifisitas 97.52%. Trade-off ini wajar
-karena 122 citra sehat adalah kelas minoritas pada test set. Table 6
-merangkum keenam konfigurasi secara berdampingan. Kedua studi
-pendahulu [4], [5] mengandalkan attention implisit untuk "fokus pada
-folikel"; hasil ini menunjukkan bahwa fokus eksplisit lewat segmentasi
-memberi manfaat terukur, dengan Grad-CAM pada Subbab 4.4 sebagai
-pemeriksaan kualitatif.
+Pola ini lebih tepat dibaca sebagai efek pemusatan area ovarium dan
+penekanan background daripada sebagai bukti deteksi ROI ovarium. E3 adalah
+kondisi terburuk (94.50%) karena CLAHE memperkuat speckle tanpa
+menghilangkan background; ROI crop memulihkan performa ke 97.00% dengan
+memusatkan resolusi 224×224 pada area gelap kandidat ovarium, sedangkan
+masked input memberi keuntungan terbesar (98.67%) karena mempertahankan
+proporsi anatomi sekaligus menekan background. Konsekuensi masked adalah
+munculnya tiga false positive, yang menjelaskan spesifisitas 97.52%.
+Trade-off ini konsisten dengan komposisi test set yang hanya memuat 121 citra
+sehat (20.2%). Table 6 merangkum keenam konfigurasi secara berdampingan.
+Artikel 1 mengandalkan attention implisit untuk fokus pada area ovarium,
+sedangkan Artikel 2 memakai Grad-CAM sebagai lapis interpretabilitas [4], [5];
+hasil di sini menunjukkan bahwa pembatasan area secara eksplisit
+memberi manfaat terukur pada test set ini, tetapi audit pada Subbab 4.5
+memperlihatkan bahwa besarnya manfaat menyusut pada citra uji yang tidak
+memiliki tetangga dekat di split latih.
 
 **Table 6. Hasil klasifikasi enam eksperimen pada test set (n = 600).**
 
@@ -427,18 +502,22 @@ Verdict H3 diuji dengan membandingkan E6 (CBAM) terhadap E4 (self-attention)
 pada preprocessing dan mode input yang sama. E6 memakai 7.35 juta parameter,
 35.6% lebih sedikit daripada 11.42 juta pada E4. Namun E6 hanya mencapai
 akurasi 96.33% (vs 97.00%) dan AUC 0.9965 (vs 0.9971), dengan latensi CPU
-150.87 ms (vs 128.93 ms, +17.0%). Kriteria H3 mensyaratkan akurasi dan AUC
+150.87 ms (vs 128.93 ms, +17.0%). Selisih akurasi −0.67 poin persentase
+memiliki 95% CI [−2.17, +0.83] dan McNemar p = 0.50, sedangkan selisih AUC
+−0.0006 memiliki CI [−0.0023, +0.0007]; keduanya mencakup nol. Secara titik,
+penurunan akurasi 0.0067 melewati toleransi 0.005, tetapi bukti yang tegas
+adalah latensi: E6 lebih lambat 17.0%. Kriteria H3 menuntut akurasi dan AUC
 tidak turun lebih dari 0.005, parameter lebih sedikit, dan latensi tidak
-lebih besar. Selisih akurasi 0.0067 (0.67 poin persentase) melewati
-toleransi dan latensi E6 lebih besar, sehingga dua syarat gagal dan
-**H3 ditolak**.
+lebih besar; karena syarat latensi gagal dan penurunan akurasi di atas
+toleransi, **H3 ditolak**. Penolakan ini bertumpu pada biaya inferensi,
+bukan pada klaim bahwa CBAM secara signifikan lebih rendah akurasinya.
 
 Hasil ini menunjukkan bahwa jumlah parameter yang lebih kecil tidak otomatis
 menurunkan biaya inferensi. Survei mekanisme attention menunjukkan bahwa tidak
 ada satu varian yang unggul di semua tugas, sehingga perbandingan harus
 diikat pada konteks arsitektur dan perangkat [26]. CBAM menambahkan dua tahap
-gating berurutan, yaitu channel attention lalu spatial attention, pada
-beberapa tingkat peta fitur. Pada CPU, rangkaian operasi tersebut lebih mahal
+gating berurutan, yaitu channel attention lalu spatial attention, pada peta
+fitur akhir sebelum pooling. Pada CPU, rangkaian operasi tersebut lebih mahal
 daripada proyeksi Q/K/V self-attention yang berjalan pada 49 token. Parameter
 dan latensi adalah dua sumbu efisiensi yang berbeda; klaim arsitektur ringan
 pada Artikel 1 [4] tanpa pengukuran latensi tidak cukup untuk menyimpulkan
@@ -455,76 +534,166 @@ kriterianya.
 
 ### 4.4. Interpretasi Kualitatif dengan Grad-CAM
 
-Gambar 4 menampilkan heatmap Grad-CAM [27] dari E4 pada lima sampel prediksi
-yang benar. Grad-CAM adalah metode penjelasan pasca-hoc yang lazim dipakai
-untuk memeriksa apakah model belajar dari region yang relevan secara klinis
-[28]. Pada sampel PCOS, aktivasi terkonsentrasi pada gugus folikel anekoik
-dan stroma ovarium di sekitarnya; pada sampel sehat, aktivasi menyebar di
-stroma ovarium tanpa hotspot folikular yang menonjol. Overlay E4 tampak
-selaras dengan mask Otsu, yang mendukung tafsiran bahwa model memakai area
-folikel, bukan background atau penanda perangkat, sebagai bukti. Sebagai
-pembanding kualitatif, heatmap E1 (baseline) pada beberapa sampel lebih
-difus dan sebagian massa aktivasi jatuh di luar area ovarium, konsisten
-dengan absennya fokus eksplisit.
+Gambar 4 menampilkan heatmap Grad-CAM [27] dari E4 untuk lima citra uji
+pertama. Kelimanya kebetulan terklasifikasi benar, tetapi pemilihan sampel
+tidak didasarkan pada kebenaran prediksi, kelas, maupun tingkat kesulitan;
+figure ini karena itu bukan sampel representatif. Grad-CAM adalah metode
+penjelasan pasca-hoc [28], dan peta fitur terakhir DenseNet-121 pada input
+224×224 berukuran 7×7, sehingga satu sel heatmap mewakili area 32×32 piksel.
+Resolusi tersebut tidak cukup untuk menempatkan struktur gelap berukuran
+2–9 mm [3].
 
-Pemeriksaan ini juga menunjukkan batas interpretasi. Pada sampel dengan satu
-kista dominan, aktivasi membentuk cincin di sekitar batas kista dan tidak
-memenuhi pusatnya; model tampak memakai tekstur tepi dan kontras, bukan isi
-kista. Secara kuantitatif, perbedaan fokus ini tampak pada confusion matrix:
-E4 menghasilkan sekitar 18 false negative dari 478 kasus PCOS, sedangkan E5
-menekannya menjadi sekitar 5 dengan konsekuensi 3 false positive dari 122
-kasus sehat. Karena hanya lima sampel per run diperiksa secara visual dan
-tidak ada kuantifikasi korelasi heatmap terhadap mask, klaim pada subbab ini
-bersifat ilustratif; arahnya konsisten dengan hasil kuantitatif H2, tetapi
-belum menjadi bukti statistik tersendiri.
+Pada Gambar 4, aktivasi E4 membentuk blob kasar yang sebagian besar berada
+di area ovarium, tetapi pada beberapa sampel massa aktivasi mencapai tepi
+citra. Pola ini konsisten dengan model yang memakai informasi area ovarium
+dan tekstur sekitarnya. Namun figure ini tidak membuktikan bahwa model
+menghitung struktur ROI, tidak menunjukkan keselarasan kuantitatif dengan mask
+Otsu, dan tidak menyingkirkan kemungkinan pemanfaatan artefak tepi, penanda
+perangkat, atau korelasi dengan kelas. Karena hanya lima sampel diperiksa
+dan tidak ada kuantifikasi korelasi heatmap terhadap mask, subbab ini
+bersifat ilustratif dan tidak dipakai sebagai bukti H2.
 
-![Gambar 4. Visualisasi heatmap Grad-CAM konfigurasi E4 pada lima sampel representatif (citra asli, heatmap aktivasi, dan overlay aktivasi).](figures/fig4_gradcam.png)
+![Gambar 4. Visualisasi heatmap Grad-CAM konfigurasi E4 pada lima citra uji pertama (citra asli, heatmap aktivasi, dan overlay aktivasi).](figures/fig4_gradcam.png)
 
-**Gambar 4. Visualisasi heatmap Grad-CAM konfigurasi E4 pada lima sampel representatif (citra asli, heatmap aktivasi, dan overlay aktivasi).**
+**Gambar 4. Visualisasi heatmap Grad-CAM konfigurasi E4 pada lima citra uji pertama (citra asli, heatmap aktivasi, dan overlay aktivasi).**
 
-### 4.5. Perbandingan dengan Studi Terdahulu
+### 4.5. Audit Kemiripan Perseptual dan Sensitivitas Hasil
+
+Deduplikasi md5 pada Subbab 3.1 hanya membuang salinan byte-identik. Untuk
+mengukur kebocoran yang tersisa, setiap citra uji dibandingkan dengan seluruh
+citra latih memakai perceptual hash 64-bit: citra grayscale di-resize ke
+32×32, ditransformasi _discrete cosine transform_ (DCT) dua dimensi, lalu
+8×8 koefisien frekuensi rendah diambangkan terhadap mediannya. Jarak Hamming minimum ke citra latih
+terdekat dihitung untuk setiap citra uji dan dibandingkan dengan baseline
+pasangan acak. Split direkonstruksi dari urutan dataset, dedup keep-first,
+dan randperm seed 42; metrik E1–E6 yang dihitung ulang dari split ini sama
+dengan angka pada Table 6 sampai empat desimal, sehingga split yang diaudit
+memang split yang dilaporkan.
+
+**Table 8. Distribusi jarak Hamming minimum citra uji ke citra latih
+terdekat (perceptual hash 64-bit, n = 600).**
+
+| Jarak minimum      | Jumlah citra uji | Persentase | Baseline pasangan acak |
+| ------------------ | ---------------- | ---------- | ---------------------- |
+| ≤ 0 (hash identik) | 100              | 16.7%      | 0.02%                  |
+| ≤ 2                | 212              | 35.3%      | 0.06%                  |
+| ≤ 4                | 287              | 47.8%      | 0.12%                  |
+| ≤ 6                | 340              | 56.7%      | 0.19%                  |
+| ≤ 8                | 391              | 65.2%      | 0.28%                  |
+| ≤ 10               | 443              | 73.8%      | 0.43%                  |
+
+Table 8 menunjukkan pengayaan yang jauh di atas kebetulan: 56.7% citra uji
+memiliki tetangga latih pada jarak ≤ 6, sedangkan pasangan acak hanya 0.19%;
+pada jarak ≤ 10 angkanya 73.8% berbanding 0.43%. Median jarak pasangan acak
+adalah 30. Sebanyak 100 citra uji bahkan memiliki hash identik dengan citra
+latih. Pemeriksaan piksel pada 100 pasangan tersebut menemukan 13 pasangan
+dengan _mean absolute error_ (MAE) < 1 dan 33 pasangan dengan korelasi > 0.99
+setelah resize 128×128, sehingga sebagian memang citra yang sama dengan
+re-encoding atau crop berbeda, sementara sebagian lain hanya berbagi struktur
+frekuensi rendah.
+
+Kemiripan ini tidak tersebar merata antar kelas. Median jarak terdekat
+adalah 4 untuk citra uji PCOS dan 10 untuk citra sehat; 307 dari 479 citra
+uji PCOS memiliki tetangga pada jarak ≤ 6, sedangkan pada kelas sehat hanya
+33 dari 121. Ini berarti metrik recall dan akurasi keseluruhan lebih
+berisiko terangkat daripada spesifisitas. Klaim bahwa test set independen
+karena sudah dideduplikasi byte tidak dapat dipertahankan; yang benar adalah
+test set bebas salinan byte-identik, tetapi tidak bebas near-duplicate
+perseptual.
+
+Untuk menguji ketahanan hasil, metrik dihitung ulang pada 157 citra uji
+yang jarak terdekatnya > 10 (47 sehat dan 110 PCOS), yaitu subset yang
+paling tidak mirip dengan split latih.
+
+**Table 9. Metrik pada seluruh test set dan pada subset citra uji tanpa
+tetangga latih berjarak ≤ 10.**
+
+| ID  | Acc penuh (%) | F1 penuh (%) | AUC penuh | Acc bersih (%) | F1 bersih (%) | AUC bersih |
+| --- | ------------- | ------------ | --------- | -------------- | ------------- | ---------- |
+| E1  | 97.67         | 98.52        | 0.9968    | 97.45          | 98.15         | 0.9983     |
+| E2  | 98.17         | 98.84        | 0.9976    | 98.09          | 98.62         | 0.9963     |
+| E3  | 94.50         | 96.43        | 0.9970    | 96.18          | 97.20         | 0.9963     |
+| E4  | 97.00         | 98.09        | 0.9971    | 96.82          | 97.67         | 0.9959     |
+| E5  | 98.67         | 99.16        | 0.9980    | 98.09          | 98.62         | 0.9990     |
+| E6  | 96.33         | 97.65        | 0.9965    | 96.18          | 97.20         | 0.9934     |
+
+Pada subset bersih, performa tidak runtuh: akurasi tetap 96.18–98.09%.
+Namun keunggulan yang dilaporkan pada seluruh test set menyusut. Selisih F1
+E4−E3 turun dari +1.66 menjadi +0.47 poin, dan selisih AUC berubah dari
++0.0001 menjadi −0.0004; McNemar pada subset ini tidak signifikan (p = 1.00).
+E5 juga tidak lagi unggul tunggal pada akurasi: E2 dan E5 sama-sama mencapai
+98.09%. Perbandingan E5−E4 pada subset bersih tidak signifikan (McNemar
+p = 0.63). Dengan ambang yang lebih ketat (> 12, n = 123), urutan berubah
+lagi: E1 dan E2 mencapai akurasi 99.19%, sedangkan E5 98.37%. Subset
+berukuran kecil (47 citra sehat) membuat interval lebar, sehingga hasil ini
+tidak boleh dibaca sebagai bukti bahwa preprocessing tidak berguna. Yang
+dapat disimpulkan adalah bahwa besarnya manfaat dan peringkat model pada
+Table 6 bergantung pada komposisi near-duplicate test set dan tidak stabil
+pada citra yang lebih independen.
+
+Temuan ini mengubah status test set, bukan seluruh hasil. Performa tinggi
+pada citra bersih menunjukkan bahwa model tidak sepenuhnya bergantung pada
+near-duplicate, tetapi angka pada Table 6 harus dibaca sebagai batas atas
+yang optimistis. Perbaikan yang paling menentukan adalah split berbasis klaster
+near-duplicate, bukan sekadar deduplikasi byte, dan replikasi pada split
+tersebut. Tanpa itu, perbandingan E3–E5 tetap merupakan perbandingan pada
+benchmark yang sama, tetapi bukan estimasi performa pada populasi citra
+baru.
+
+### 4.6. Perbandingan dengan Studi Terdahulu
 
 Konfigurasi terbaik pada penelitian ini, E5, mencapai akurasi 98.67% dan AUC
-0.9980; E2 (denoising tanpa segmentasi) mencapai 98.17% dan AUC 0.9976.
-Artikel 1 [4] melaporkan 99.13% pada dataset yang sama, sedangkan Artikel 2
-[5] melaporkan 94.8% pada PCOSGen yang berbeda. Karena pada penelitian ini
-dataset tersebut dipakai setelah deduplikasi, sebagian kesenjangan terhadap
-Artikel 1 wajar terjadi: angka 99.13% berpeluang memuat keuntungan duplikasi
-antar-split yang tidak dapat diverifikasi dari laporan mereka. Sebaliknya,
-selisih terhadap Artikel 2 tidak dapat ditafsirkan karena dataset dan
-komposisi kelasnya berbeda.
+0.9980; E2 (denoising tanpa pembangkitan ROI) mencapai 98.17% dan AUC 0.9976.
+Artikel 1 [4] melaporkan 99.13% pada dataset yang sama. Artikel tersebut
+menyatakan bahwa dataset sengaja mempertahankan duplikasi, dengan lebih dari
+1.956 kelompok duplikat, dan tidak melaporkan deduplikasi sebelum split.
+Sebaliknya, penelitian ini membuang 7.788 salinan byte-identik dan masih
+menemukan kemiripan perseptual yang tinggi (Subbab 4.5). Kedua angka karena
+itu dihasilkan dari protokol evaluasi yang tidak sebanding, sehingga
+selisihnya tidak dapat ditafsirkan sebagai keunggulan salah satu metode.
+Angka 99.13% juga tidak disertai interval kepercayaan atau audit duplikasi,
+sehingga tidak dapat dijadikan acuan tunggal. Selisih terhadap Artikel 2 [5]
+tidak dapat ditafsirkan karena dataset dan komposisi kelasnya berbeda.
 
 Yang dapat dibandingkan secara adil adalah baseline internal: E1 tanpa
-denoising dan segmentasi sudah mencapai 97.67%. Pada dataset ini tugas
+denoising dan tanpa pembangkitan ROI mencapai 97.67%. Pada dataset ini tugas
 klasifikasi mendekati plafon, sehingga ruang perbaikan yang tersedia hanya
-beberapa poin persentase; efek denoising (+0.50 poin) dan segmentasi
-(+1.66 poin F1 dari E3 ke E4) karena itu lebih bermakna sebagai bukti peran
-preprocessing daripada sebagai klaim keunggulan absolut. Penelitian ini juga
-melaporkan parameter dan latensi CPU (114–151 ms) yang tidak disertakan
-Artikel 1 [4], sehingga perbandingan efisiensi dapat dilakukan secara terbuka.
+beberapa poin persentase; efek denoising (+0.50 poin) dan pembangkitan ROI
+(+1.66 poin F1 dari E3 ke E4 pada seluruh test set, +0.47 poin pada subset
+bersih) karena itu lebih bermakna sebagai bukti peran preprocessing daripada
+sebagai klaim keunggulan absolut. Penelitian ini juga melaporkan parameter
+dan latensi CPU (114–151 ms) yang tidak disertakan Artikel 1 [4], sehingga
+perbandingan efisiensi dapat dilakukan secara terbuka.
 
-### 4.6. Batasan dan Ancaman Validitas
+### 4.7. Batasan dan Ancaman Validitas
 
-1. Kontrol duplikat hanya memakai hash byte-identik. Frame berurutan
-   dari perekaman video yang sama dapat nyaris identik tetapi lolos md5.
-   Bila metadata pasien/video tersedia, split level pasien adalah perbaikan
-   paling penting berikutnya.
+1. Kontrol duplikat utama hanya memakai hash byte-identik. Audit perceptual
+   hash pada Subbab 4.5 menemukan bahwa 56.7% citra uji memiliki tetangga
+   latih pada jarak Hamming ≤ 6, dan pengaruhnya lebih besar pada kelas PCOS.
+   Split berbasis klaster near-duplicate, atau split level pasien bila
+   metadata tersedia, adalah perbaikan paling penting berikutnya.
 2. Eksperimen memakai satu seed, satu run, dan early stopping yang cepat.
    E4 dan E6 berhenti pada epoch terbaik ke-2, E3 pada epoch ke-7, sementara
    kurva validasi berfluktuasi; hasil satu run rentan terhadap variasi
-   inisialisasi. Toleransi verdict 0.005 berada dekat rentang noise,
-   sehingga replikasi multi-seed (minimum tiga) perlu dijadwalkan.
-3. Test set berukuran kecil (600 citra: 478 PCOS, 122 sehat). Satu kesalahan
+   inisialisasi. Toleransi verdict 0.005 berada dekat rentang noise, dan
+   bootstrap CI pada Subbab 4.1–4.3 hanya menangkap variabilitas sampling
+   test, bukan variabilitas pelatihan. Replikasi multi-seed (minimum tiga)
+   perlu dijadwalkan.
+3. Test set berukuran kecil (600 citra: 479 PCOS, 121 sehat). Satu kesalahan
    setara dengan 0.17 poin akurasi. Margin AUC H2 (0.0001) jauh lebih kecil
    dari perubahan yang dapat dipicu variasi satu run, sehingga verdict H2
-   bertumpu pada selisih F1 (+1.66 poin), bukan pada AUC.
+   bertumpu pada selisih F1 (+1.66 poin pada seluruh test set), bukan pada
+   AUC, dan selisih itu menyusut menjadi +0.47 poin pada subset bersih.
 4. Ketimpangan kelas 4:1 membuat akurasi murni menyesatkan; karena itu
    specificity, F1, dan AUC dilaporkan bersamaan.
-5. Segmentasi tidak memiliki ground-truth. Kualitas mask hanya dinilai
-   secara kualitatif dan melalui statistik ROI; tidak ada metrik Dice klinis.
-6. Latensi hanya diukur pada CPU Colab. Angka 114–151 ms bukan representasi
-   perangkat target, dan hasil H3 menunjukkan parameter bukan proksi latensi.
-   Uji pada perangkat keras sasaran tetap diperlukan untuk klaim low-resource.
+5. Mask tidak memiliki ground-truth dan secara konstruksi adalah detektor
+   area gelap, bukan segmentasi folikel. Kualitas mask hanya dinilai secara
+   kualitatif dan melalui statistik ROI; tidak ada metrik Dice klinis, dan
+   arah coverage antar kelas tidak konsisten dengan deteksi ROI ovarium.
+6. Latensi hanya diukur pada CPU Colab, dan identitas CPU tidak tercatat.
+   Angka 114–151 ms bukan representasi perangkat target; angka itu sah untuk
+   perbandingan relatif antar model pada sesi yang sama. Uji pada perangkat
+   keras sasaran tetap diperlukan untuk klaim low-resource.
 7. Scope penelitian tidak mencakup fusi multimodal (G1), validasi antar
    dataset (G2), dan kuantifikasi ketidakpastian (G3). Angka 99.72% dari
    titik awal proyek dikenali sebagai kebocoran test set (81% test set
@@ -534,25 +703,34 @@ Artikel 1 [4], sehingga perbandingan efisiensi dapat dilakukan secara terbuka.
 
 Penelitian ini menguji tiga klaim yang ditinggalkan tanpa bukti oleh studi
 pendahulu pada satu dataset dan satu pipeline yang sama. Pertama, wavelet
-denoising BayesShrink meningkatkan performa klasifikasi secara konsisten
-meski kecil: akurasi 97.67% menjadi 98.17% dan AUC 0.9968 menjadi 0.9976,
-sejalan dengan perubahan citra yang minimal (PSNR ±51 dB). Kedua, fokus
-folikel eksplisit melalui segmentasi Otsu bermanfaat: ROI crop memulihkan
+denoising BayesShrink meningkatkan performa klasifikasi meski kecil:
+akurasi 97.67% menjadi 98.17% dan AUC 0.9968 menjadi 0.9976, sejalan dengan
+perubahan citra yang minimal (PSNR ±51 dB). Bukti ini lemah karena interval
+selisih akurasinya mencakup nol; verdict H1 bertumpu pada aturan prespecified,
+bukan pada signifikansi statistik. Kedua, pembatasan area ovarium lewat ROI
+dari mask area gelap bermanfaat pada test set ini: ROI crop memulihkan
 akurasi dari 94.50% (E3) ke 97.00% (E4) dan menaikkan F1 sebesar 1.66 poin,
-sementara masked input memberi hasil terbaik (98.67% akurasi, F1 99.16%,
-AUC 0.9980) dengan konsekuensi tiga false positive. Ketiga, klaim attention
-ringan tidak terbukti: CBAM memakai 35.6% parameter lebih sedikit tetapi
-0.67 poin lebih rendah akurasinya dan 17.0% lebih lambat pada CPU, sehingga
-jumlah parameter bukan proksi yang memadai bagi efisiensi inferensi.
+sementara masked input memberi hasil tertinggi (98.67% akurasi, F1 99.16%,
+AUC 0.9980) dengan konsekuensi tiga false positive. Namun audit perceptual
+hash menunjukkan 56.7% citra uji memiliki tetangga dekat di split latih, dan
+pada 157 citra yang paling tidak mirip keunggulan F1 menyusut menjadi 0.47
+poin serta tidak terpisah dari nol. Manfaat preprocessing karena itu sah
+sebagai perbandingan internal pada benchmark yang sama, tetapi belum menjadi
+estimasi performa pada citra independen. Ketiga, klaim attention ringan tidak
+terbukti: CBAM memakai 35.6% parameter lebih sedikit tetapi 17.0% lebih
+lambat pada CPU, sehingga H3 ditolak terutama karena biaya inferensi, bukan
+karena penurunan akurasi yang signifikan.
 
 Kesimpulan ini berlaku dalam batas desain yang dinyatakan sejak awal: satu
-split level citra, satu seed, satu run per eksperimen, dataset tunggal, dan
-ketimpangan kelas 4:1 dengan test set 600 citra. Replikasi multi-seed,
-validasi antar dataset, split level pasien, kuantifikasi ketidakpastian, dan
-pengujian pada perangkat target adalah langkah berikutnya untuk menguji
-ketahanan temuan. Pengukuran ablasi yang tidak disertakan Artikel 1 maupun 2
-membuat klaim denoising, fokus folikel, dan efisiensi attention di sini dapat
-diperiksa ulang dari angka yang dilaporkan.
+split level citra dengan near-duplicate perseptual yang belum dikontrol
+sepenuhnya, satu seed, satu run per eksperimen, dataset tunggal, dan
+ketimpangan kelas 4:1 dengan test set 600 citra. Split berbasis klaster
+near-duplicate, replikasi multi-seed, validasi antar dataset, split level
+pasien, kuantifikasi ketidakpastian, dan pengujian pada perangkat target
+adalah langkah berikutnya untuk menguji ketahanan temuan. Pengukuran ablasi
+yang tidak disertakan Artikel 1 maupun 2 membuat klaim denoising,
+pembangkitan ROI, dan efisiensi attention di sini dapat diperiksa ulang dari
+angka yang dilaporkan.
 
 ## Konflik Kepentingan
 

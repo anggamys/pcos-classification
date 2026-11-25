@@ -6,25 +6,25 @@ Sumber konten: `references/kajian-literatur-gap-hipotesis.md` (sumber tunggal na
 
 ## Keputusan pra-penulisan (perlu dikunci lebih dulu)
 
-| Keputusan                   | Opsi                                                                                                                                                                                                                 | Status                              |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Keputusan                   | Opsi                                                                                                                                                                                                                 | Status                                               |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | Bahasa isi                  | Indonesia (judul/abstrak/kata kunci Inggris) atau full Inggris                                                                                                                                                       | Dikunci: Indonesia, judul/abstrak/kata kunci Inggris |
-| Cara tulis                  | Edit langsung `JUTIF-Template.docx`                                                                                                                                                                                  | Sesuai saran panduan                |
-| Bagian Result               | E1–E6 selesai; Draf 3 sudah memuat angka riil dan 28 referensi terverifikasi                                                                                                                                         | Selesai — sisa metadata penulis     |
-| Framing replikasi Artikel 1 | Dilaporkan sebagai re-run independen yang gagal valid (karena dedup + placement fix), bukan replikasi sukses; angka lama (99,72%) TIDAK dipakai sebagai hasil valid karena test set lama terkontaminasi 81% duplikat | Sudah diputuskan di README          |
-| Sudut evaluasi              | Analisis Citra Medis (performa diagnostik + interpretabilitas); PSNR/SSIM dari sisi PCD dilaporkan sebagai bukti deskriptif H1, bukan cerita utama                                                                   | Sesuai README proyek                |
+| Cara tulis                  | Edit langsung `JUTIF-Template.docx`                                                                                                                                                                                  | Sesuai saran panduan                                 |
+| Bagian Result               | E1–E6 selesai; Draf 4 memuat angka riil, audit near-duplicate, bootstrap CI, dan 28 referensi terverifikasi                                                                                                          | Selesai — sisa metadata penulis                      |
+| Framing replikasi Artikel 1 | Dilaporkan sebagai re-run independen yang gagal valid (karena dedup + placement fix), bukan replikasi sukses; angka lama (99,72%) TIDAK dipakai sebagai hasil valid karena test set lama terkontaminasi 81% duplikat | Sudah diputuskan di README                           |
+| Sudut evaluasi              | Analisis Citra Medis (performa diagnostik + interpretabilitas); PSNR/SSIM dari sisi PCD dilaporkan sebagai bukti deskriptif H1, bukan cerita utama                                                                   | Sesuai README proyek                                 |
 
 ## Judul (≤ 20 kata, Inggris, tanpa nama studi kasus)
 
-Kandidat 1 (14 kata, adaptasi judul kerja):
+Kandidat 1 (18 kata, dipakai di Draf 4):
 
-> **Impact of Wavelet Denoising and Follicle Segmentation on PCOS Classification
-> from Ultrasound Images Using Attention-Based DenseNet-121**
+> **Impact of Wavelet Denoising and Unsupervised Ovarian ROI Generation on PCOS
+> Classification from Ultrasound Images Using Attention-Based DenseNet-121**
 
 Kandidat 2 (15 kata, menonjolkan perbandingan attention = gap G4):
 
-> **Follicle-Focused Preprocessing and Attention Mechanism Comparison for PCOS
-> Ultrasound Classification with Grad-CAM**
+> **Ovarian-ROI-Focused Preprocessing and Attention Mechanism Comparison for
+> PCOS Ultrasound Classification with Grad-CAM**
 
 Catatan: kata "Grad-CAM" di judul opsional; cukup di abstrak/kata kunci bila ingin judul fokus metode.
 
@@ -41,24 +41,27 @@ Lima gerakan, masing-masing 1–2 kalimat:
 1. **Latar belakang**: interpretasi USG PCOS subjektif antar-operator; dua studi
    terdahulu memakai attention tanpa ablasi denoising dan tanpa membandingkan
    mekanisme attention.
-2. **Tujuan**: mengukur pengaruh wavelet denoising (BayesShrink) dan segmentasi
-   folikel unsupervised terhadap performa DenseNet-121 + Attention, serta
-   membandingkan self-attention vs CBAM.
+2. **Tujuan**: mengukur pengaruh wavelet denoising (BayesShrink) dan
+   pembangkitan ROI ovarium unsupervised terhadap performa DenseNet-121 +
+   Attention, serta membandingkan self-attention vs CBAM.
 3. **Metode**: ablation study enam konfigurasi (E1–E6) pada PCOS-XAI dataset
    (3.996 citra unik pasca deduplikasi md5; rasio kelas 4:1 ditangani pos_weight
    BCE), split 70/15/15 dengan seed tetap; metrik Accuracy/F1/Specificity/AUC +
    Grad-CAM.
-4. **Hasil**: denoising menaikkan akurasi 97,67% → 98,17% (H1 diterima);
-   segmentasi ROI menaikkan F1 96,43% → 98,09% (H2 diterima); masked
-   mencapai 98,67%/AUC 0,9980 (deskriptif); CBAM lebih ringan 35,6% tetapi
-   lebih rendah 0,67 poin dan 17,0% lebih lambat (H3 ditolak).
-5. **Temuan/dampak**: ablasi preprocessing yang tidak dilakukan Artikel 1/2
-   dan bukti bahwa jumlah parameter bukan proksi latensi pada skrining
-   low-resource.
+4. **Hasil**: denoising menaikkan akurasi 97.67% → 98.17% (H1 diterima,
+   bukti lemah); pembangkitan ROI menaikkan F1 96.43% → 98.09% (H2 diterima);
+   masked mencapai 98.67%/AUC 0.9980 (deskriptif); CBAM lebih ringan 35.6%
+   tetapi lebih lambat 17.0% (H3 ditolak). Audit perceptual hash menemukan
+   56.7% citra uji punya tetangga dekat di train; pada 157 citra paling tidak
+   mirip, keunggulan F1 menyusut ke 0.47 poin.
+5. **Temuan/dampak**: ablasi preprocessing yang tidak dilakukan Artikel 1/2,
+   bukti bahwa jumlah parameter bukan proksi latensi pada skrining
+   low-resource, dan peringatan bahwa deduplikasi byte saja tidak menghapus
+   near-duplicate perseptual.
 
 Kata kunci (3–6, alfabetis, Inggris), draf: Attention Mechanism, CBAM,
-Grad-CAM, Ovarian Follicle Segmentation, Polycystic Ovary Syndrome, Ultrasound
-Image Classification. (Urutkan alfabetis final.)
+Deep Learning, Ovarian ROI Generation, Polycystic Ovary Syndrome, Ultrasound
+Classification. (Urutkan alfabetis final.)
 
 ## Sistematika bab (judul eksplisit, maksimal 2 level; total ±4.000–5.000 kata di luar abstrak/referensi)
 
@@ -105,9 +108,10 @@ gambar), bernomor kanan atas, dirujuk di teks: (1) threshold adaptif
 BayesShrink σ; (2) rumus CLAHE bila sempit. Fig. 1: diagram pipeline
 (tulis semua teks dalam Inggris, ±300 dpi).
 
-3.3 **Unsupervised Follicle Segmentation and Input Modes** — Otsu/adaptive +
+3.3 **Unsupervised Ovarian ROI Generation and Input Modes** — Otsu/adaptive +
 morfologi + hapus komponen tepi + fallback persentil gelap saat Otsu menangkap
-background (coverage > 50%). Definisi 3 mode input: full / ROI crop / masked.
+background (coverage > 50%). Mask adalah detektor area gelap, bukan segmentasi
+folikel anatomis. Definisi 3 mode input: full / ROI crop / masked.
 Table 2: ringkas mode input.
 
 3.4 **Attention Mechanisms and Backbone** — DenseNet-121 + tiga keluarga
@@ -124,7 +128,7 @@ menyesatkan pada rasio 4:1.
 
 3.6 **Hypotheses, Experiment Matrix, and Evaluation Metrics** — Table 4:
 matriks E1–E6 (dari `experiments/experiments.yml`) + pemetaan ke hipotesis
-H1–H3 dan kriteria kesuksesan deskriptif (toleransi 0,005; satu split sehingga
+H1–H3 dan kriteria kesuksesan deskriptif (toleransi 0.005; satu split sehingga
 tanpa uji signifikansi formal — nyatakan dari awal). Metrik: Accuracy,
 Precision, Recall, F1, Specificity, AUC, params, latency CPU
 (`infer_ms_cpu`); PSNR/SSIM dari `evaluate_quality.py` sebagai bukti deskriptif
@@ -135,7 +139,7 @@ hash; (d) satu run per eksperimen.
 
 Catatan JUTIF: state of the art masuk di bagian ini — sertakan singkat kenapa
 pilihan lain (MBBO, SMOTE, EfficientNet-B3 pada Artikel 2) berada di luar scope
-(fokus: wavelet denoising, segmentasi folikel, DenseNet-121 + Attention,
+(fokus: wavelet denoising, pembangkitan ROI ovarium, DenseNet-121 + Attention,
 Grad-CAM).
 
 ### 4. Results and Discussion (50–65% → ±2.400–3.200 kata)
@@ -151,14 +155,15 @@ Tabel/gambar rencana:
 - Table 6: hasil klasifikasi E1–E6 (`results.csv`: Accuracy, F1, Specificity,
   AUC + params + latency).
 - Table 7: verdict H1–H3 (`accepted`/`not_accepted` dari `matrix_summary.json`).
-- Fig. 2: contoh hasil segmentasi (original → mask → ROI crop).
+- Fig. 2: contoh hasil pembangkitan ROI (original → mask → ROI crop).
 - Fig. 3: kurva ROC + confusion matrix model utama.
-- Fig. 4: Grad-CAM overlay untuk argumen fokus folikel.
+- Fig. 4: Grad-CAM overlay untuk menunjukkan batas interpretasi (peta fitur
+  7×7, blob kasar tingkat ovarium, bukan bukti folikel individual).
 
   4.1 **Denoising Effect on Image Quality and Classification (E1 vs E2)** — dari
   verdict H1; sisipkan Table 5 dan Fig. 2 bila relevan.
 
-  4.2 **Effect of Follicle Segmentation on Classification (E3 vs E4 vs E5)** —
+  4.2 **Effect of Ovarian ROI Generation on Classification (E3 vs E4 vs E5)** —
   verdict H2; E4 (ROI crop Otsu) adalah varian prespecified dengan AUC sebagai
   metrik utama; E5 (masked) pelaporan deskriptif saja (bukan pemilihan varian
   terbaik di atas test set).
@@ -166,21 +171,26 @@ Tabel/gambar rencana:
   4.3 **Accuracy–Efficiency Trade-off of Attention Mechanisms (E4 vs E6)** —
   verdict H3; bandingkan parameter + `infer_ms_cpu`.
 
-  4.4 **Qualitative Interpretation with Grad-CAM** — heatmap menghadapi klaim
-  kecil bahwa model "fokus folikel, mengabaikan background"; bahas
-  false negative/false positive (FN paling berbahaya untuk skrining).
+  4.4 **Qualitative Interpretation with Grad-CAM** — lima citra uji pertama
+  (bukan sampel representatif); peta fitur 7×7 hanya mendukung klaim tingkat
+  area ovarium, bukan folikel individual; jangan klaim keselarasan mask.
 
-  4.5 **Comparison with Prior Studies** — sebutkan konteks angka Artikel 1
-  (99,13%) dan Artikel 2 (94,8%) TANPA klaim mengalahkan; tegaskan beda desain
-  (dedup, split level citra, satu seed, satu run) membuat perbandingan antar
-  dataset tidak 1-1.
+  4.5 **Perceptual Near-Duplicate Audit and Sensitivity** — pHash 64-bit,
+  jarak Hamming ke train, baseline pasangan acak, metrik pada subset bersih;
+  test set tidak independen secara ketat.
 
-  4.6 **Threats to Validity and Limitations** — frame berurutan dari video yang
-  sama pasca-dedup bisa nyaris identik; satu-seed pada toleransi 0,005;
-  G1–G3 di luar scope; replikasi lama tidak valid sebagai justifikasi desain.
+  4.6 **Comparison with Prior Studies** — sebutkan konteks angka Artikel 1
+  (99.13%) dan Artikel 2 (94.8%) TANPA klaim mengalahkan; Artikel 1
+  mempertahankan duplikasi (>1.956 kelompok) dan tidak melaporkan deduplikasi,
+  sehingga protokol tidak sebanding.
 
-Angka bagian ini sudah terisi di Draf 3 dan dilacak ke
-`experiments/results/` serta `experiments/quality/summary.json`.
+  4.7 **Threats to Validity and Limitations** — near-duplicate perseptual;
+  satu-seed pada toleransi 0.005; G1–G3 di luar scope; replikasi lama tidak
+  valid sebagai justifikasi desain.
+
+Angka bagian ini sudah terisi di Draf 4 dan dilacak ke
+`experiments/results/`, `experiments/quality/summary.json`, dan
+`experiments/quality/near_duplicate_audit.json`.
 
 ### 5. Conclusion (paragraf, bukan daftar; jangan mengulang abstrak; ±150–250 kata)
 
